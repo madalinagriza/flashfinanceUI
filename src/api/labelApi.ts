@@ -3,7 +3,6 @@
 import { apiClient } from './client'
 import type {
   Label,
-  TransactionInfo,
   StageLabelRequest,
   FinalizeLabelRequest,
   CancelLabelRequest,
@@ -13,8 +12,12 @@ import type {
   GetTxInfoRequest,
   GetCategoryHistoryRequest,
   HasLabelsForCategoryRequest,
+  SuggestLabelRequest,
   LabelTxIdResponse,
   HasLabelsResponse,
+  SuggestLabelResponse,
+  TransactionInfoResponse,
+  ListLabelsRequest,
 } from './types'
 
 export const labelApi = {
@@ -70,8 +73,8 @@ export const labelApi = {
    * POST /api/Label/getTxInfo
    * Returns the transaction info document for the given user and transaction.
    */
-  async getTxInfo(request: GetTxInfoRequest): Promise<TransactionInfo[]> {
-    return apiClient.post<GetTxInfoRequest, TransactionInfo[]>('/Label/getTxInfo', request)
+  async getTxInfo(request: GetTxInfoRequest): Promise<TransactionInfoResponse> {
+    return apiClient.post<GetTxInfoRequest, TransactionInfoResponse>('/Label/getTxInfo', request)
   },
 
   /**
@@ -89,8 +92,8 @@ export const labelApi = {
    * POST /api/Label/all
    * Returns all label documents.
    */
-  async all(): Promise<Label[]> {
-    return apiClient.post<Record<string, never>, Label[]>('/Label/all', {})
+  async all(request: ListLabelsRequest): Promise<Label[]> {
+    return apiClient.post<ListLabelsRequest, Label[]>('/Label/all', request)
   },
 
   /**
@@ -102,5 +105,13 @@ export const labelApi = {
       '/Label/hasAnyLabelsForCategory',
       request
     )
+  },
+
+  /**
+   * POST /api/Label/suggest
+   * Returns an AI-suggested category for a transaction, without modifying any state.
+   */
+  async suggest(request: SuggestLabelRequest): Promise<SuggestLabelResponse> {
+    return apiClient.post<SuggestLabelRequest, SuggestLabelResponse>('/Label/suggest', request)
   },
 }

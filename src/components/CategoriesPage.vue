@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   navigate: [page: string]
+  'view-category': [category: CategoryNameOwner]
 }>()
 
 const allCategories = ref<CategoryNameOwner[]>([])
@@ -33,20 +34,18 @@ const extractUserId = (u: any): string | null => {
 
 const extractedUserId = computed(() => extractUserId(props.user))
 
-const userCategories = computed(() => {
-  const uid = extractedUserId.value
-  if (!uid) return []
-  return allCategories.value.filter(c => (c.owner_id || '') === uid)
-})
-
 const fetchCategories = async () => {
   error.value = null
   loading.value = true
   try {
-    const result = await categoryApi.getCategoryNamesAndOwners()
-    console.log('Categories API response:', result)
-    console.log('Response type:', typeof result, 'Is array:', Array.isArray(result))
-    allCategories.value = result || []
+    const ownerId = extractedUserId.value
+    if (!ownerId) {
+      allCategories.value = []
+      error.value = 'Sign in to load your categories.'
+      return
+    }
+    const categories = await categoryApi.getCategoriesWithNames(ownerId)
+    allCategories.value = categories
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load categories'
     console.error('Categories fetch error:', e)
@@ -86,6 +85,10 @@ const addCategory = async () => {
   } finally {
     adding.value = false
   }
+}
+
+const viewCategory = (category: CategoryNameOwner) => {
+  emit('view-category', category)
 }
 
 // Editing state
@@ -129,8 +132,8 @@ const saveEdit = async (c: any, idx: number) => {
     // we're showing the canonical server state after the rename/create.
     await fetchCategories()
 
-    // Check for duplicate names for this owner after refresh
-    const ownerCats = allCategories.value.filter(x => (x.owner_id || '') === ownerId)
+    // Check for duplicate names after refresh
+    const ownerCats = allCategories.value
     const nameCounts: Record<string, number> = {}
     ownerCats.forEach(x => {
       const n = x.name || ''
@@ -193,19 +196,15 @@ onMounted(() => {
         <div v-else>
           <div class="debug-info">
             <small style="color: #999;">
-              All categories: {{ allCategories.length }} | 
-              Your categories: {{ userCategories.length }} | 
+              Categories loaded: {{ allCategories.length }} |
               Your user ID: {{ user?.user_id }}
             </small>
           </div>
-          <div v-if="userCategories.length === 0" class="empty">
+          <div v-if="allCategories.length === 0" class="empty">
             No categories yet.
-            <div v-if="allCategories.length > 0" style="margin-top: 0.5rem; font-size: 0.9em; color: #666;">
-              ({{ allCategories.length }} total categories exist, but none belong to you)
-            </div>
           </div>
           <ul v-else class="category-list">
-            <li v-for="(c, idx) in userCategories" :key="(c.category_id || c.name) + ':' + c.owner_id">
+            <li v-for="(c, idx) in allCategories" :key="(c.category_id || c.name) + ':' + c.owner_id">
               <span class="dot"></span>
               <template v-if="editingIndex === idx">
                 <input v-model="editName" class="edit-input" />
@@ -216,6 +215,7 @@ onMounted(() => {
               <template v-else>
                 <span class="name">{{ c.name }}</span>
                 <span class="owner-id"><code>{{ c.owner_id }}</code></span>
+                <button class="btn-small" @click.prevent="viewCategory(c)">View</button>
                 <button class="btn-small" @click.prevent="startEdit(c, idx)">Edit</button>
               </template>
             </li>
@@ -226,9 +226,8 @@ onMounted(() => {
       <div class="list-card debug-card">
         <h3>🐛 All Categories (Debug)</h3>
         <div v-if="loading" class="loading">Loading…</div>
-        <div v-else-if="allCategories.length === 0" class="empty">
-          No categories in system.
-          <pre style="margin-top: 1rem; font-size: 0.8em;">Raw data: {{ JSON.stringify(allCategories, null, 2) }}</pre>
+        <div v-if="allCategories.length === 0" class="empty">
+          No categories found for your account.
         </div>
         <div v-else>
           <div style="margin-bottom: 1rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85em;">

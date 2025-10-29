@@ -1,9 +1,7 @@
 <template>
   <div class="labeling-page">
-    <div class="topbar">
-      <button class="btn-back" @click="$emit('navigate', 'unlabeled')">← Back to Unlabeled Transactions</button>
-    </div>
-    <div class="container" v-if="transaction">
+    <!-- Back button removed per request: single-forward flow only -->
+    <div class="container" v-if="currentTx">
       <div class="header">
         <h1>Label Transaction</h1>
         <p>Categorize the spending below.</p>
@@ -12,19 +10,28 @@
       <div class="transaction-card">
         <div class="info-row">
           <span class="label">Merchant:</span>
-          <span class="value merchant">{{ transaction.merchant_text }}</span>
+          <span class="value merchant">{{ currentTx!.merchant_text }}</span>
         </div>
         <div class="info-row">
           <span class="label">Date:</span>
-          <span class="value">{{ transaction.date }}</span>
+          <span class="value">{{ currentTx!.date }}</span>
         </div>
         <div class="info-row">
           <span class="label">Amount:</span>
-          <span class="value amount">{{ formatCurrency(transaction.amount) }}</span>
+          <span class="value amount">{{ formatCurrency(currentTx!.amount) }}</span>
         </div>
          <div class="info-row">
           <span class="label">Transaction ID:</span>
-          <span class="value mono">{{ transaction.tx_id }}</span>
+          <span class="value mono">{{ currentTx!.tx_id }}</span>
+        </div>
+      </div>
+
+      <div class="session-bar" v-if="sessionTransactions.length">
+        <div>
+          Session: {{ sessionIndex + 1 }} / {{ sessionTransactions.length }}
+        </div>
+        <div class="session-actions">
+          <button type="button" class="btn-next" @click="nextTx" :disabled="stageLoading || finalizeLoading">Next</button>
         </div>
       </div>
 
@@ -34,19 +41,22 @@
         <div v-if="error" class="error-message">{{ error }}</div>
         <div v-if="stageError" class="error-message">{{ stageError }}</div>
         <div v-if="stageMessage" class="success-message">{{ stageMessage }}</div>
-        <div v-if="visibleCategories.length > 0" class="category-list">
+        <div v-if="suggestLoading" class="loading-message">Getting suggestion…</div>
+        <div v-if="suggestError" class="error-message">⚠️ Suggestion failed: {{ suggestError }}</div>
+        <div v-if="!suggestLoading && visibleCategories.length > 0" class="category-list">
           <button
             v-for="category in visibleCategories"
             :key="category.category_id"
-            class="category-item"
+            :class="['category-item', { 'category-suggested': category.category_id === suggestedCategoryId }]"
             type="button"
             @click="stageCategory(category)"
             :disabled="stageLoading"
           >
             {{ category.name }}
+            <span v-if="category.category_id === suggestedCategoryId" class="suggest-badge">✨ Suggested</span>
           </button>
         </div>
-        <div v-else-if="!loading && !error" class="no-data">
+        <div v-else-if="!loading && !error && !suggestLoading" class="no-data">
           No categories found.
         </div>
 
@@ -57,14 +67,14 @@
             @click="finalizeLabeling"
             :disabled="finalizeLoading || !userId"
           >
-            {{ finalizeLoading ? 'Finalizing…' : '✅ Finish Labeling' }}
+            {{ finalizeLoading ? 'Finalizing…' : '✅ Finalize Session' }}
           </button>
           <div v-if="finalizeError" class="error-message">{{ finalizeError }}</div>
           <div v-if="finalizeMessage" class="success-message">{{ finalizeMessage }}</div>
         </div>
       </div>
     </div>
-    <div v-else class="container">
+  <div v-else class="container">
         <p>No transaction selected for labeling.</p>
     </div>
   </div>
@@ -93,6 +103,22 @@ const stageMessage = ref<string | null>(null);
 const finalizeLoading = ref(false);
 const finalizeError = ref<string | null>(null);
 const finalizeMessage = ref<string | null>(null);
+const suggestedCategoryId = ref<string | null>(null);
+const suggestError = ref<string | null>(null);
+const suggestLoading = ref(false);
+// Track if the current transaction was staged in this session
+const wasStagedHere = ref(false);
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Session state: queue of unlabeled transactions and current pointer
+const sessionTransactions = ref<Transaction[]>([]);
+const sessionIndex = ref(0);
+const sessionStagedTxIds = ref<Set<string>>(new Set());
+
+// Active transaction for this page (falls back to prop)
+const activeTx = ref<Transaction | null>(null);
+const currentTx = computed(() => activeTx.value ?? props.transaction);
 
 const extractUserId = (value: unknown): string | null => {
   if (!value) return null;
@@ -133,8 +159,8 @@ const fetchCategories = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await categoryApi.getCategoryNamesAndOwners();
-    allCategories.value = Array.isArray(response) ? response : [];
+    const categories = await categoryApi.getCategoriesWithNames(uid);
+    allCategories.value = categories;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load categories.';
     console.error('Fetch categories error:', err);
@@ -143,8 +169,58 @@ const fetchCategories = async () => {
   }
 };
 
+const fetchSuggestion = async () => {
+  const tx = currentTx.value;
+  const uid = userId.value;
+  
+  if (!uid || !tx) return;
+  
+  suggestedCategoryId.value = null;
+  suggestError.value = null;
+
+  try {
+    const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${tx.tx_id}`;
+    const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
+
+    // Build the allCategories tuple list [name, id] for this user
+    const categoryPairs: [string, string][] = visibleCategories.value
+      .filter(c => !!c.category_id && !!c.name)
+      .map(c => [c.name, c.category_id!]);
+
+    if (categoryPairs.length === 0) {
+      // Per spec, allCategories must be non-empty; skip calling suggest
+      suggestError.value = 'No categories available to suggest.';
+      return;
+    }
+
+    suggestLoading.value = true;
+    const suggestPayload = {
+      user_id: uid,
+      allCategories: categoryPairs,
+      txInfo: {
+        tx_id: tx.tx_id,
+        tx_name: txName,
+        tx_merchant: txMerchant,
+      },
+    } as const;
+
+    console.debug('Calling /api/Label/suggest with payload:', suggestPayload);
+
+    const suggestion = await labelApi.suggest(suggestPayload);
+
+    console.debug('Suggest response:', suggestion);
+
+    suggestedCategoryId.value = suggestion.id;
+  } catch (err) {
+    suggestError.value = err instanceof Error ? err.message : 'Failed to get suggestion.';
+    console.error('Fetch suggestion error:', err);
+  } finally {
+    suggestLoading.value = false;
+  }
+};
+
 const stageCategory = async (category: CategoryNameOwner) => {
-  const tx = props.transaction;
+  const tx = currentTx.value;
   const uid = userId.value;
 
   if (stageLoading.value) {
@@ -177,13 +253,11 @@ const stageCategory = async (category: CategoryNameOwner) => {
       category_id: category.category_id,
     });
 
-    stageMessage.value = `Stage successful! label_tx_id: ${response.label_tx_id}`;
-
-    // Immediately mark the transaction as LABELED
-    await transactionApi.markLabeled({ tx_id: tx.tx_id, requester_id: uid });
-
-    // Navigate back to unlabeled list to trigger refresh
-    emit('navigate', 'unlabeled');
+    stageMessage.value = `Staged category "${category.name}". Click "Finalize Session" to complete.`;
+    wasStagedHere.value = true;
+    sessionStagedTxIds.value.add(tx.tx_id);
+    // Auto-advance to the next transaction after successful staging
+    nextTx();
   } catch (err) {
     stageError.value = err instanceof Error ? err.message : 'Failed to stage transaction.';
     console.error('Stage transaction error:', err);
@@ -193,6 +267,7 @@ const stageCategory = async (category: CategoryNameOwner) => {
 };
 
 const finalizeLabeling = async () => {
+  const tx = currentTx.value;
   const uid = userId.value;
 
   if (finalizeLoading.value) return;
@@ -202,13 +277,36 @@ const finalizeLabeling = async () => {
     return;
   }
 
+  if (!tx) {
+    finalizeError.value = 'No transaction to finalize.';
+    return;
+  }
+
   finalizeLoading.value = true;
   finalizeError.value = null;
   finalizeMessage.value = null;
 
   try {
+    // Finalize all staged labels (commits to permanent labels)
     await labelApi.finalize({ user_id: uid });
-    finalizeMessage.value = 'Labeling finalized successfully!';
+    
+    // Mark all transactions staged during this session as LABELED
+    const stagedIds = Array.from(sessionStagedTxIds.value);
+    for (const sId of stagedIds) {
+      try {
+        await transactionApi.markLabeled({ tx_id: sId, requester_id: uid });
+      } catch (e) {
+        console.warn('Failed to mark labeled for tx', sId, e);
+      }
+    }
+    finalizeMessage.value = stagedIds.length > 0
+      ? `Finalized ${stagedIds.length} labeled transaction(s).`
+      : 'No transactions were staged; nothing to finalize.';
+    
+    // Navigate back to unlabeled list after brief delay
+    setTimeout(() => {
+      emit('navigate', 'unlabeled');
+    }, 1000);
   } catch (err) {
     finalizeError.value = err instanceof Error ? err.message : 'Failed to finalize labeling.';
     console.error('Finalize labeling error:', err);
@@ -224,17 +322,77 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-onMounted(fetchCategories);
+// Normalize various server shapes for owner_id to a string (copied from Unlabeled page)
+const extractOwnerId = (value: unknown): string => {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object') {
+    const o = value as any
+    const candidate = o.value ?? o.id ?? o.user_id ?? o.owner_id
+    if (typeof candidate === 'string') return candidate
+    if (candidate != null) {
+      try { return String(candidate) } catch { /* noop */ }
+    }
+  }
+  try { return String(value) } catch { return '' }
+}
+
+const fetchSessionTransactions = async () => {
+  const uid = userId.value
+  if (!uid) return
+  try {
+    const resp = await transactionApi.getUnlabeledTransactions({ owner_id: uid })
+    const arr = Array.isArray(resp) ? resp : []
+    // Filter to only current user and keep order
+    sessionTransactions.value = arr
+      .map((t: any) => ({ ...t, owner_id: extractOwnerId(t?.owner_id) }))
+      .filter(t => t.owner_id === uid)
+  } catch (e) {
+    console.error('Failed to fetch session transactions', e)
+  }
+}
+
+onMounted(async () => {
+  await fetchCategories();
+  await fetchSessionTransactions();
+  // Initialize activeTx from provided prop if present, else first in queue
+  const startId = props.transaction?.tx_id
+  if (startId) {
+    const idx = sessionTransactions.value.findIndex(t => t.tx_id === startId)
+    sessionIndex.value = idx >= 0 ? idx : 0
+  } else {
+    sessionIndex.value = 0
+  }
+  activeTx.value = sessionTransactions.value[sessionIndex.value] ?? props.transaction ?? null
+  // Ensure categories are loaded before requesting a suggestion (spec requires non-empty categories)
+  await fetchSuggestion();
+});
 
 watch(
-  () => props.transaction?.tx_id,
+  () => currentTx.value?.tx_id,
   () => {
     stageMessage.value = null;
     stageError.value = null;
     finalizeMessage.value = null;
     finalizeError.value = null;
+    suggestedCategoryId.value = null;
+    suggestError.value = null;
+    wasStagedHere.value = false;
+    fetchSuggestion();
   }
 );
+
+// Navigation helpers
+const nextTx = () => {
+  if (sessionIndex.value < sessionTransactions.value.length - 1) {
+    sessionIndex.value += 1
+    activeTx.value = sessionTransactions.value[sessionIndex.value] || null
+  }
+}
+
+const skipTx = () => {
+  nextTx()
+}
 </script>
 
 <style scoped>
@@ -337,6 +495,27 @@ h1 {
   text-align: center;
 }
 
+.session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 1rem 0;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.session-actions { display: flex; gap: 0.5rem; }
+.btn-skip, .btn-next {
+  padding: 0.4rem 0.8rem;
+  background: #edf2f7;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-next { background: #e6fffa; border-color: #b2f5ea; color: #234e52; }
+
 .actions h2 {
   margin-bottom: 1.5rem;
   color: #333;
@@ -396,6 +575,24 @@ h1 {
   opacity: 0.65;
   transform: none;
   box-shadow: none;
+}
+
+.category-suggested {
+  background-color: #fef3c7 !important;
+  border: 2px solid #f59e0b !important;
+  color: #92400e !important;
+  font-weight: 600;
+  position: relative;
+}
+
+.category-suggested:hover {
+  background-color: #fde68a !important;
+  color: #78350f !important;
+}
+
+.suggest-badge {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
 }
 
 .finalize {
