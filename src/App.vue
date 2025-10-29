@@ -6,21 +6,45 @@ import UsersPage from './components/UsersPage.vue'
 import MainPage from './components/MainPage.vue'
 import ImportSpendingsPage from './components/ImportSpendingsPage.vue'
 import CategoriesPage from './components/CategoriesPage.vue'
+import CategoryDetailPage from './components/CategoryDetailPage.vue'
 import UnlabeledTransactionsPage from './components/UnlabeledTransactionsPage.vue'
 import LabelingPage from './components/LabelingPage.vue'
-import type { User, Transaction } from './api'
+import type { CategoryNameOwner, Transaction, User } from './api'
 
-type Page = 'signin' | 'register' | 'users' | 'main' | 'import' | 'categories' | 'unlabeled' | 'labeling';
+type Page =
+  | 'signin'
+  | 'register'
+  | 'users'
+  | 'main'
+  | 'import'
+  | 'categories'
+  | 'categoryDetail'
+  | 'unlabeled'
+  | 'labeling'
 
 const currentPage = ref<Page>('signin')
 const currentUser = ref<User | null>(null)
 const transactionToLabel = ref<Transaction | null>(null)
+const selectedCategory = ref<CategoryNameOwner | null>(null)
 
 const navigateTo = (page: Page | string) => {
   // A simple type guard to be safe
-  const validPages: (Page | string)[] = ['signin', 'register', 'users', 'main', 'import', 'categories', 'unlabeled', 'labeling'];
+  const validPages: (Page | string)[] = [
+    'signin',
+    'register',
+    'users',
+    'main',
+    'import',
+    'categories',
+    'categoryDetail',
+    'unlabeled',
+    'labeling',
+  ]
   if (validPages.includes(page)) {
     currentPage.value = page as Page;
+    if (page === 'categories') {
+      selectedCategory.value = null
+    }
   }
 }
 
@@ -31,12 +55,18 @@ const handleSignIn = (user: User) => {
 
 const handleSignOut = () => {
   currentUser.value = null
+  selectedCategory.value = null
   currentPage.value = 'signin'
 }
 
 const handleStartLabeling = (transaction: Transaction) => {
   transactionToLabel.value = transaction;
   currentPage.value = 'labeling';
+}
+
+const handleViewCategory = (category: CategoryNameOwner) => {
+  selectedCategory.value = category
+  currentPage.value = 'categoryDetail'
 }
 </script>
 
@@ -85,7 +115,18 @@ const handleStartLabeling = (transaction: Transaction) => {
       @navigate="navigateTo"
     />
     <ImportSpendingsPage v-if="currentPage === 'import'" :user="currentUser" @navigate="navigateTo" />
-    <CategoriesPage v-if="currentPage === 'categories'" :user="currentUser" @navigate="navigateTo" />
+    <CategoriesPage
+      v-if="currentPage === 'categories'"
+      :user="currentUser"
+      @navigate="navigateTo"
+      @view-category="handleViewCategory"
+    />
+    <CategoryDetailPage
+      v-if="currentPage === 'categoryDetail'"
+      :user="currentUser"
+      :category="selectedCategory"
+      @navigate="navigateTo"
+    />
     <UnlabeledTransactionsPage v-if="currentPage === 'unlabeled'" :user="currentUser" @navigate="navigateTo" @start-labeling="handleStartLabeling" />
     <LabelingPage v-if="currentPage === 'labeling'" :transaction="transactionToLabel" :user="currentUser" @navigate="navigateTo" />
   </div>

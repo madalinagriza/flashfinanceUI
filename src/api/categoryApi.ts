@@ -3,16 +3,45 @@
 import { apiClient } from './client'
 import type {
   CategoryNameOwner,
-  CategoryMetric,
   CreateCategoryRequest,
   RenameCategoryRequest,
   DeleteCategoryRequest,
-  SetMetricTotalRequest,
-  GetMetricRequest,
-  ListMetricsRequest,
   CategoryIdResponse,
   OkResponse,
+  GetCategoriesFromOwnerRequest,
+  OwnerCategoryId,
+  GetCategoryNameByIdRequest,
+  CategoryNameResponse,
 } from './types'
+
+const resolveId = (value: unknown): string | null => {
+  if (value == null) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if (typeof obj.$oid === 'string') return obj.$oid
+    if (typeof obj.value === 'string') return obj.value
+    if (typeof obj.id === 'string') return obj.id
+    if (typeof obj.category_id === 'string') return obj.category_id
+    if (typeof obj.categoryId === 'string') return obj.categoryId
+  }
+  return null
+}
+
+const resolveName = (value: unknown): string | null => {
+  if (value == null) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (Array.isArray(value) && value.length > 0) return resolveName(value[0])
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if (typeof obj.name === 'string') return obj.name
+    if (typeof obj.value === 'string') return obj.value
+    if (typeof obj.label === 'string') return obj.label
+  }
+  return null
+}
 
 export const categoryApi = {
   /**
@@ -40,62 +69,92 @@ export const categoryApi = {
   },
 
   /**
-   * POST /api/Category/set_metric_total
-   * Creates or updates a category metric's total for a specific period.
-   */
-  async setMetricTotal(request: SetMetricTotalRequest): Promise<OkResponse> {
-    return apiClient.post<SetMetricTotalRequest, OkResponse>('/Category/set_metric_total', request)
-  },
-
-  /**
    * POST /api/Category/getCategoryNamesAndOwners
-   * Retrieves a list of all category names and their owners.
+   * Retrieves a list of category names and owners for the specified user.
    */
-  async getCategoryNamesAndOwners(): Promise<CategoryNameOwner[]> {
-    const raw = await apiClient.post<Record<string, never>, any[]>(
+  async getCategoryNamesAndOwners(owner_id: string): Promise<CategoryNameOwner[]> {
+    const raw = await apiClient.post<{ owner_id: string }, any[]>(
       '/Category/getCategoryNamesAndOwners',
-      {}
+      { owner_id }
     )
 
-    // Helper to extract string owner id from various shapes
-    const extractOwnerId = (v: any): string | null => {
-      if (v == null) return null
-      if (typeof v === 'string') return v
-      if (typeof v === 'object') {
-        if (typeof v.value === 'string') return v.value
-        if (typeof v.value === 'object' && typeof v.value.value === 'string') return v.value.value
-      }
-      // fallback to string coercion
-      try { return String(v) } catch { return null }
-    }
+    return (raw || [])
+      .map((r: any) => {
+        const categoryId = resolveId(r?.category_id) ?? resolveId(r?._id) ?? resolveId(r)
+        if (!categoryId) return null
 
-    const extractCategoryId = (r: any): string | undefined => {
-      if (!r) return undefined
-      if (typeof r.category_id === 'string') return r.category_id
-      if (r._id && typeof r._id === 'string') return r._id
-      return undefined
-    }
+  const ownerValue = resolveId(r?.owner_id) ?? owner_id
+  const nameValue = resolveName(r?.name) ?? ''
 
-    return (raw || []).map((r: any) => ({
-      category_id: extractCategoryId(r),
-      name: r.name,
-      owner_id: extractOwnerId(r.owner_id) || ''
-    })) as CategoryNameOwner[]
+        return {
+          category_id: categoryId,
+          name: nameValue,
+          owner_id: ownerValue,
+        } as CategoryNameOwner
+      })
+      .filter((entry): entry is CategoryNameOwner => entry !== null)
   },
 
   /**
-   * POST /api/Category/getMetric
-   * Retrieves a specific category metric document for a given owner, category, and period.
+   * POST /api/Category/getCategoriesFromOwner
+   * Returns the list of category ids for the specified owner.
    */
-  async getMetric(request: GetMetricRequest): Promise<CategoryMetric[]> {
-    return apiClient.post<GetMetricRequest, CategoryMetric[]>('/Category/getMetric', request)
+  async getCategoriesFromOwner(owner_id: string): Promise<OwnerCategoryId[]> {
+    const raw = await apiClient.post<GetCategoriesFromOwnerRequest, any[]>(
+      '/Category/getCategoriesFromOwner',
+      { owner_id }
+    )
+
+    return (raw || [])
+      .map((entry: any) => {
+        const categoryId = resolveId(entry?.category_id) ?? resolveId(entry?._id) ?? resolveId(entry)
+        return categoryId ? ({ category_id: categoryId } as OwnerCategoryId) : null
+      })
+      .filter((entry): entry is OwnerCategoryId => entry !== null)
   },
 
   /**
-   * POST /api/Category/listMetrics
-   * Lists all category metrics for a given owner and category, sorted by period start date.
+   * POST /api/Category/getCategoryNameById
+   * Returns the stored name for a category id scoped to an owner.
    */
-  async listMetrics(request: ListMetricsRequest): Promise<CategoryMetric[]> {
-    return apiClient.post<ListMetricsRequest, CategoryMetric[]>('/Category/listMetrics', request)
+  async getCategoryNameById(request: GetCategoryNameByIdRequest): Promise<CategoryNameResponse> {
+    return apiClient.post<GetCategoryNameByIdRequest, CategoryNameResponse>(
+      '/Category/getCategoryNameById',
+      request
+    )
+  },
+
+  /**
+   * Helper that combines getCategoriesFromOwner and getCategoryNameById to produce
+   * full category records for the provided owner.
+   */
+  async getCategoriesWithNames(owner_id: string): Promise<CategoryNameOwner[]> {
+    const idEntries = await this.getCategoriesFromOwner(owner_id)
+    if (!Array.isArray(idEntries) || idEntries.length === 0) return []
+
+    const categories = await Promise.all(
+      idEntries.map(async ({ category_id }) => {
+        const normalizedId = resolveId(category_id)
+        if (!normalizedId) return null
+        try {
+          const response = await this.getCategoryNameById({ owner_id, category_id: normalizedId })
+          const resolvedName = resolveName(response) ?? resolveName((response as any)?.name) ?? normalizedId
+          return {
+            category_id: normalizedId,
+            name: resolvedName || normalizedId,
+            owner_id,
+          } as CategoryNameOwner
+        } catch (err) {
+          console.error('getCategoriesWithNames: failed to resolve name', normalizedId, err)
+          return {
+            category_id: normalizedId,
+            name: normalizedId,
+            owner_id,
+          } as CategoryNameOwner
+        }
+      })
+    )
+
+    return categories.filter((entry): entry is CategoryNameOwner => entry !== null)
   },
 }

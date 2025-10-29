@@ -55,11 +55,23 @@ export interface MarkLabeledRequest {
 }
 
 export interface GetTransactionRequest {
+  owner_id: string
   tx_id: string
 }
 
 export interface GetUnlabeledTransactionsRequest {
   owner_id: string
+}
+
+export interface GetTxInfoRequest {
+  owner_id: string
+  tx_id: string
+}
+
+export interface TransactionInfoResponse {
+  date: string
+  merchant_text: string
+  amount: number
 }
 
 // ===== Category Types =====
@@ -70,17 +82,9 @@ export interface Category {
 }
 
 export interface CategoryNameOwner {
-  category_id?: string
+  category_id: string
   name: string
   owner_id: string
-}
-
-export interface CategoryMetric {
-  owner_id: string
-  category_id: string
-  period_start: string
-  period_end: string
-  current_total: number
 }
 
 export interface CreateCategoryRequest {
@@ -100,28 +104,21 @@ export interface DeleteCategoryRequest {
   can_delete: boolean
 }
 
-export interface SetMetricTotalRequest {
+export interface GetCategoriesFromOwnerRequest {
   owner_id: string
-  category_id: string
-  period: {
-    startDate: string
-    endDate: string
-  }
-  total: number
 }
 
-export interface GetMetricRequest {
-  owner_id: string
+export interface OwnerCategoryId {
   category_id: string
-  period: {
-    startDate: string
-    endDate: string
-  }
 }
 
-export interface ListMetricsRequest {
+export interface GetCategoryNameByIdRequest {
   owner_id: string
   category_id: string
+}
+
+export interface CategoryNameResponse {
+  name: string
 }
 
 // ===== Label Types =====
@@ -131,12 +128,6 @@ export interface Label {
   tx_id: string
   category_id: string
   created_at: string
-}
-
-export interface TransactionInfo {
-  _id: string
-  tx_name: string
-  tx_merchant: string
 }
 
 export interface StageLabelRequest {
@@ -167,11 +158,6 @@ export interface RemoveLabelRequest {
 }
 
 export interface GetLabelRequest {
-  user_id: string
-  tx_id: string
-}
-
-export interface GetTxInfoRequest {
   user_id: string
   tx_id: string
 }
@@ -208,5 +194,24 @@ export interface TxIdResponse {
 }
 
 export interface HasLabelsResponse {
-  has_labels: boolean
+  result: boolean
+}
+
+export interface ListLabelsRequest {
+  user_id: string
+}
+
+export interface SuggestLabelRequest {
+  user_id: string
+  allCategories: [string, string][]
+  txInfo: {
+    tx_id: string
+    tx_name: string
+    tx_merchant: string
+  }
+}
+
+export interface SuggestLabelResponse {
+  id: string
+  name: string
 }

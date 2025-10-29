@@ -8,15 +8,15 @@ API Specification: Category Concept
 
 ### POST /api/Category/create
 
-**Description:** Creates a new category for a given user with a specified name.
+**Description:** Generates a new category ID, creates and stores a category under `owner_id` associated with `name`, and returns the created category's ID.
 
 **Requirements:**
-- user owner_id exists
-- for the same owner_id, no existing category with same name
+- user owner\_id exists
+- for the same owner\_id, no existing category with same name
 
 **Effects:**
-- generated a new category_id
-- creates and stores a category under owner_id associated with name
+- generated a new category\_id
+- creates and stores a category under owner\_id associated with name
 - returns it
 
 **Request Body:**
@@ -44,14 +44,14 @@ API Specification: Category Concept
 
 ### POST /api/Category/rename
 
-**Description:** Renames an existing category for a given user.
+**Description:** Updates the category's name to `new_name` and returns the updated category's ID.
 
 **Requirements:**
-- category exists and category.owner_id = owner_id
-- for the same owner_id, no existing category with same new_name
+- category exists and category.owner\_id = owner\_id
+- for the same owner\_id, no existing category with same new\_name
 
 **Effects:**
-- updates category.name to new_name
+- updates category.name to new\_name
 - returns updated category
 
 **Request Body:**
@@ -80,11 +80,11 @@ API Specification: Category Concept
 
 ### POST /api/Category/delete
 
-**Description:** Deletes a category and its associated metrics, provided it's safe to delete.
+**Description:** Removes the category (and its CategoryMetrics) if `can_delete` is true, returning true; otherwise leaves state unchanged and returns false.
 
 **Requirements:**
-- category exists and category.owner_id = owner_id
-- can_delete = true (only called by the sync which gets result from label's)
+- category exists and category.owner\_id = owner\_id
+- can\_delete = true (only called by the sync which gets result from label's)
 
 **Effects:**
 - removes the category (and its CategoryMetrics) and returns true
@@ -114,23 +114,26 @@ API Specification: Category Concept
 ```
 ---
 
-### POST /api/Category/setMetricTotal
+### POST /api/Category/set_metric_total
 
-**Description:** Creates or updates a category metric's total for a specific period.
+**Description:** Creates or updates the metric for a given owner, category, and period with the specified total.
 
 **Requirements:**
 - owner and category exist
 - total ≥ 0
 
 **Effects:**
-- creates or updates the metric for (owner, category, period) with current_total = total
+- creates or updates the metric for (owner, category, period) with current\_total = total
 
 **Request Body:**
 ```json
 {
   "owner_id": "string",
   "category_id": "string",
-  "period": "string (ISO Date__ISO Date)",
+  "period": {
+    "startDate": "string (ISO 8601)",
+    "endDate": "string (ISO 8601)"
+  },
   "total": "number"
 }
 ```
@@ -152,13 +155,13 @@ API Specification: Category Concept
 
 ### POST /api/Category/getCategoryNamesAndOwners
 
-**Description:** Retrieves a list of all category names and their owners.
+**Description:** Retrieves all category IDs, names, and owner IDs across all categories.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- returns list of all category names and their owners
+- Returns a list of all category IDs, names, and owner IDs.
 
 **Request Body:**
 ```json
@@ -169,8 +172,45 @@ API Specification: Category Concept
 ```json
 [
   {
+    "category_id": "string",
     "name": "string",
     "owner_id": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
+
+### POST /api/Category/getCategoryNameById
+
+**Description:** Returns the name of a category given its owner ID and category ID.
+
+**Requirements:**
+- owner_id is required
+- category is found for that owner
+
+**Effects:**
+- Returns the name of the specified category.
+
+**Request Body:**
+```json
+{
+  "owner_id": "string",
+  "category_id": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "name": "string"
   }
 ]
 ```
@@ -188,17 +228,20 @@ API Specification: Category Concept
 **Description:** Retrieves a specific category metric document for a given owner, category, and period.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Retrieves a specific CategoryMetric document.
+- Returns the document or null if not found.
 
 **Request Body:**
 ```json
 {
   "owner_id": "string",
   "category_id": "string",
-  "period": "string (ISO Date__ISO Date)"
+  "period": {
+    "startDate": "string (ISO 8601)",
+    "endDate": "string (ISO 8601)"
+  }
 }
 ```
 
@@ -208,8 +251,8 @@ API Specification: Category Concept
   {
     "owner_id": "string",
     "category_id": "string",
-    "period_start": "string (ISO Date)",
-    "period_end": "string (ISO Date)",
+    "period_start": "string (ISO 8601)",
+    "period_end": "string (ISO 8601)",
     "current_total": "number"
   }
 ]
@@ -225,13 +268,13 @@ API Specification: Category Concept
 
 ### POST /api/Category/listMetrics
 
-**Description:** Lists all category metrics for a given owner and category, sorted by period start date.
+**Description:** Lists all category metrics for a given owner and category, sorted by period start date ascending.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Lists all CategoryMetrics for a given owner and category, sorted by period_start ascending.
+- Returns all CategoryMetrics for a given owner and category, sorted by period\_start ascending.
 
 **Request Body:**
 ```json
@@ -247,8 +290,8 @@ API Specification: Category Concept
   {
     "owner_id": "string",
     "category_id": "string",
-    "period_start": "string (ISO Date)",
-    "period_end": "string (ISO Date)",
+    "period_start": "string (ISO 8601)",
+    "period_end": "string (ISO 8601)",
     "current_total": "number"
   }
 ]
@@ -272,15 +315,15 @@ API Specification: Category Concept
 
 ### POST /api/Label/stage
 
-**Description:** Creates a StagedLabel for a user and transaction, preparing it for finalization.
+**Description:** Creates a StagedLabel for the user and transaction with the provided info and category, adds it to the staged labels, and returns the transaction ID of the created staged label.
 
 **Requirements:**
 - no committed label exists for `tx_id`
-- no stagedLabel with ID tx_id.
+- no stagedLabel with ID tx\_id.
 
 **Effects:**
-- creates a StagedLabel for this user and transaction with the provided info and category.
-- Adds it to the stagedLabels (that are not yet commited).
+- creates a StagedLabel for this user and transaction with the provided info and category
+- Adds it to the stagedLabels (that are not yet commited)
 - Returns the created stagedLabel.
 
 **Request Body:**
@@ -311,16 +354,16 @@ API Specification: Category Concept
 
 ### POST /api/Label/finalize
 
-**Description:** Commits all staged labels for a user, turning them into permanent labels and history records.
+**Description:** For each StagedLabel belonging to the user, creates a TransactionInfo, creates a new Label linking `tx_id` to `category_id` and `user_id`, adds TransactionInfo to CategoryHistory under the chosen category, and then wipes stagedLabels for the user.
 
 **Requirements:**
 - for each StagedLabel belonging to the user: no committed label exists for `tx_id`
 
 **Effects:**
-- for each StagedLabel belonging to the user:
-  - creates a TransactionInfo
-  - creates a new Label linking `tx_id` to `category_id` and `user_id`
-  - adds TransactionInfo to CategoryHistory under the chosen category
+- for each StagedLabel belonging to the user
+- creates a TransactionInfo
+- creates a new Label linking `tx_id` to `category_id` and `user_id`
+- adds TransactionInfo to CategoryHistory under the chosen category
 - after processing all staged labels, wipes stagedLabels
 
 **Request Body:**
@@ -345,7 +388,7 @@ API Specification: Category Concept
 
 ### POST /api/Label/cancel
 
-**Description:** Deletes all staged labels for a user without committing them.
+**Description:** Deletes all StagedLabels for that user without committing them.
 
 **Requirements:**
 - true (a user may cancel a pending session at any time)
@@ -376,7 +419,7 @@ API Specification: Category Concept
 
 ### POST /api/Label/update
 
-**Description:** Changes the category of an existing label for a specific transaction.
+**Description:** Updates CategoryHistory, associating TransactionInfo with the new category, replaces the label’s `category_id` with `new_category_id`, updates `created_at` to now, and returns the updated label's transaction ID.
 
 **Requirements:**
 - a label for `tx_id` exists
@@ -416,7 +459,7 @@ API Specification: Category Concept
 
 ### POST /api/Label/remove
 
-**Description:** Reassigns a transaction's label to the user's built-in Trash category.
+**Description:** Reassigns the transaction’s label to the user’s built-in **Trash** category and updates CategoryHistory.
 
 **Requirements:**
 - a label for `tx_id` exists
@@ -448,16 +491,62 @@ API Specification: Category Concept
 }
 ```
 ---
+### POST /api/Label/suggest
+
+**Description:** Ask the Label concept to suggest a single category for one transaction given the user's categories and per-owner category history; returns the chosen category (id + name).
+
+**Requirements:**
+- `user_id` is required.
+- `allCategories` MUST be a non-empty array (the implementation throws if empty).
+
+**Effects:**
+- Builds a per-user category history snapshot from stored CategoryHistory (catTx + txInfos).
+- Constructs a prompt including categories, history, and the provided transaction info.
+- Calls the configured Gemini LLM to get a single suggested category.
+- Parses and validates the LLM JSON response and returns the matched CategoryMeta.
+
+**Request Body:**
+```json
+{
+  "user_id": "string",
+  "allCategories": [
+    ["categoryName", "categoryId"],
+    ["categoryName", "categoryId"]
+    ...
+  ],
+  "txInfo": {
+    "tx_id": "string",
+    "tx_name": "string",
+    "tx_merchant": "string"
+  }
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "id": "string",
+  "name": "string"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
 
 ### POST /api/Label/getLabel
 
-**Description:** Returns the label document for the given user and transaction.
+**Description:** Retrieves a specific label document for a given user and transaction ID.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns the label document for the given user and transaction.
+- Returns the label document or null if not found.
 
 **Request Body:**
 ```json
@@ -471,11 +560,10 @@ API Specification: Category Concept
 ```json
 [
   {
-    "_id": "string",
     "user_id": "string",
     "tx_id": "string",
     "category_id": "string",
-    "created_at": "string (ISO Date)"
+    "created_at": "string (ISO 8601)"
   }
 ]
 ```
@@ -490,13 +578,13 @@ API Specification: Category Concept
 
 ### POST /api/Label/getTxInfo
 
-**Description:** Returns the transaction info document for the given user and transaction.
+**Description:** Retrieves transaction information for a given user and transaction ID.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns the transaction info document for the given user and transaction.
+- Returns the transaction info document or null if not found.
 
 **Request Body:**
 ```json
@@ -510,7 +598,7 @@ API Specification: Category Concept
 ```json
 [
   {
-    "_id": "string",
+    "tx_id": "string",
     "tx_name": "string",
     "tx_merchant": "string"
   }
@@ -527,13 +615,13 @@ API Specification: Category Concept
 
 ### POST /api/Label/getCategoryHistory
 
-**Description:** Returns a list of transaction IDs associated with a specific category for a user.
+**Description:** Retrieves the transaction IDs associated with a specific category for a given user.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns a list of transaction IDs associated with a specific category for a user.
+- Returns a list of transaction IDs (strings).
 
 **Request Body:**
 ```json
@@ -560,13 +648,13 @@ API Specification: Category Concept
 
 ### POST /api/Label/all
 
-**Description:** Returns all label documents.
+**Description:** Retrieves all label documents.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns all label documents.
+- Returns a list of all label documents.
 
 **Request Body:**
 ```json
@@ -577,11 +665,10 @@ API Specification: Category Concept
 ```json
 [
   {
-    "_id": "string",
     "user_id": "string",
     "tx_id": "string",
     "category_id": "string",
-    "created_at": "string (ISO Date)"
+    "created_at": "string (ISO 8601)"
   }
 ]
 ```
@@ -596,13 +683,13 @@ API Specification: Category Concept
 
 ### POST /api/Label/hasAnyLabelsForCategory
 
-**Description:** Returns true if any labels exist for the given user and category, false otherwise.
+**Description:** Checks if a given category has any associated labels for a specific user.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns true if any labels exist for the given user and category, false otherwise.
+- Returns true if the category has any labels for the user, false otherwise.
 
 **Request Body:**
 ```json
@@ -616,7 +703,7 @@ API Specification: Category Concept
 ```json
 [
   {
-    "has_labels": "boolean"
+    "hasLabels": "boolean"
   }
 ]
 ```
@@ -637,17 +724,17 @@ API Specification: Category Concept
 
 ## API Endpoints
 
-### POST /api/Transaction/import_transactions
+### POST /api/Transaction/importTransactions
 
-**Description:** Parses a CSV file and converts its rows into new, unlabeled transactions owned by a user.
+**Description:** Parses the provided file content, converts rows into Transactions owned by `owner_id` with status UNLABELED, generates new `tx_ids` for each transaction, and adds them to the state.
 
 **Requirements:**
 - owner exists
 - file id is valid
 
 **Effects:**
-- parses the files and converts rows into Transactions owned by owner_id with status UNLABELED
-- generates new tx_ids for each transaction
+- parses the files and converts rows into Transactions owned by owner\_id with status UNLABELED
+- generates new tx\_ids for each transaction
 - adds them to state
 - returns the created list
 
@@ -661,16 +748,7 @@ API Specification: Category Concept
 
 **Success Response Body (Action):**
 ```json
-[
-  {
-    "tx_id": "string",
-    "owner_id": "string",
-    "date": "string (ISO Date)",
-    "merchant_text": "string",
-    "amount": "number",
-    "status": "string (UNLABELED|LABELED)"
-  }
-]
+{}
 ```
 
 **Error Response Body:**
@@ -683,11 +761,11 @@ API Specification: Category Concept
 
 ### POST /api/Transaction/mark_labeled
 
-**Description:** Sets a transaction's status to LABELED after verifying ownership.
+**Description:** Sets the transaction's status to LABELED.
 
 **Requirements:**
-- transaction tx_id exists
-- requester_id = transaction.owner_id
+- transaction tx\_id exists
+- requester\_id = transaction.owner\_id
 
 **Effects:**
 - sets transaction.status to LABELED
@@ -717,17 +795,18 @@ API Specification: Category Concept
 
 ### POST /api/Transaction/getTransaction
 
-**Description:** Retrieves a single transaction document by its ID.
+**Description:** Retrieves a single transaction document by its ID and owner.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Retrieves a single transaction document by its ID.
+- Returns the TransactionDoc.
 
 **Request Body:**
 ```json
 {
+  "owner_id": "string",
   "tx_id": "string"
 }
 ```
@@ -738,10 +817,10 @@ API Specification: Category Concept
   {
     "tx_id": "string",
     "owner_id": "string",
-    "date": "string (ISO Date)",
+    "date": "string (ISO 8601)",
     "merchant_text": "string",
     "amount": "number",
-    "status": "string (UNLABELED|LABELED)"
+    "status": "string"
   }
 ]
 ```
@@ -756,13 +835,13 @@ API Specification: Category Concept
 
 ### POST /api/Transaction/list_all
 
-**Description:** Returns all transaction documents in the system.
+**Description:** Retrieves all transaction documents.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns all transaction documents.
+- Returns a list of all transaction documents.
 
 **Request Body:**
 ```json
@@ -775,10 +854,88 @@ API Specification: Category Concept
   {
     "tx_id": "string",
     "owner_id": "string",
-    "date": "string (ISO Date)",
+    "date": "string (ISO 8601)",
     "merchant_text": "string",
     "amount": "number",
-    "status": "string (UNLABELED|LABELED)"
+    "status": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
+
+### POST /api/Transaction/get_unlabeled_transactions
+
+**Description:** Retrieves all unlabeled transactions belonging to a specific owner ID.
+
+**Requirements:**
+- None.
+
+**Effects:**
+- Returns an array of unlabeled TransactionDoc objects.
+
+**Request Body:**
+```json
+{
+  "owner_id": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "tx_id": "string",
+    "owner_id": "string",
+    "date": "string (ISO 8601)",
+    "merchant_text": "string",
+    "amount": "number",
+    "status": "string"
+  }
+]
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
+
+### POST /api/Transaction/get_labeled_transactions
+
+**Description:** Retrieves all labeled transactions belonging to a specific owner ID.
+
+**Requirements:**
+- None.
+
+**Effects:**
+- Returns an array of labeled TransactionDoc objects.
+
+**Request Body:**
+```json
+{
+  "owner_id": "string"
+}
+```
+
+**Success Response Body (Query):**
+```json
+[
+  {
+    "tx_id": "string",
+    "owner_id": "string",
+    "date": "string (ISO 8601)",
+    "merchant_text": "string",
+    "amount": "number",
+    "status": "string"
   }
 ]
 ```
@@ -801,13 +958,13 @@ API Specification: Category Concept
 
 ### POST /api/User/register
 
-**Description:** Registers a new user with a unique email, name, and password.
+**Description:** Creates a new user with a fresh user ID, password hash derived from the password, status ACTIVE, adds the user to Users, and returns the created user.
 
 **Requirements:**
 - email is not used by any existing user
 
 **Effects:**
-- creates a new user with a fresh user_id, password_hash derived from password, status ACTIVE
+- creates a new user with a fresh user\_id, password\_hash derived from password, status ACTIVE
 - adds the user to Users
 - returns the created user
 
@@ -826,7 +983,7 @@ API Specification: Category Concept
   "user_id": "string",
   "email": "string",
   "name": "string",
-  "status": "string (ACTIVE|INACTIVE)"
+  "status": "string"
 }
 ```
 
@@ -840,10 +997,10 @@ API Specification: Category Concept
 
 ### POST /api/User/authenticate
 
-**Description:** Authenticates a user with their email and password.
+**Description:** Authenticates a user with the given email and password, returning the user if successful.
 
 **Requirements:**
-- there exists a user with the given email whose password_hash matches password and whose status is ACTIVE
+- there exists a user with the given email whose password\_hash matches password and whose status is ACTIVE
 
 **Effects:**
 - returns that user
@@ -862,7 +1019,7 @@ API Specification: Category Concept
   "user_id": "string",
   "email": "string",
   "name": "string",
-  "status": "string (ACTIVE|INACTIVE)"
+  "status": "string"
 }
 ```
 
@@ -876,10 +1033,10 @@ API Specification: Category Concept
 
 ### POST /api/User/deactivate
 
-**Description:** Sets a user's account status to INACTIVE.
+**Description:** Sets the user's status to INACTIVE.
 
 **Requirements:**
-- a user with user_id exists
+- a user with user\_id exists
 
 **Effects:**
 - sets the user's status to INACTIVE
@@ -906,13 +1063,13 @@ API Specification: Category Concept
 
 ### POST /api/User/changePassword
 
-**Description:** Changes a user's password after verifying the old password.
+**Description:** Updates the user's password hash with the `new_password` and returns true if successful.
 
 **Requirements:**
-- a user with user_id exists and old_password matches the stored password_hash
+- a user with user\_id exists and old\_password matches the stored password\_hash
 
 **Effects:**
-- updates password_hash with new_password
+- updates password\_hash with new\_password
 - returns true
 
 **Request Body:**
@@ -941,7 +1098,7 @@ API Specification: Category Concept
 
 ### POST /api/User/reactivate
 
-**Description:** Reactivates an inactive user account and updates their password.
+**Description:** Sets the user’s `status` to ACTIVE, updates the user’s `password_hash` with the hash of `new_password`, and returns true if successful.
 
 **Requirements:**
 - a user with the given email exists and `status = INACTIVE`
@@ -976,13 +1133,13 @@ API Specification: Category Concept
 
 ### POST /api/User/all
 
-**Description:** Returns all user documents in the system.
+**Description:** Retrieves all user objects.
 
 **Requirements:**
-- true (implicitly)
+- None.
 
 **Effects:**
-- Returns all user documents.
+- Returns a list of all user objects.
 
 **Request Body:**
 ```json
@@ -996,7 +1153,7 @@ API Specification: Category Concept
     "user_id": "string",
     "email": "string",
     "name": "string",
-    "status": "string (ACTIVE|INACTIVE)"
+    "status": "string"
   }
 ]
 ```
