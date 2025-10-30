@@ -37,6 +37,15 @@
 
       <div class="actions">
         <h2>Select a Category</h2>
+        <button
+          v-if="!loading && !error && currentTx && userId"
+          class="btn-discard"
+          type="button"
+          @click="discardCurrentTx"
+          :disabled="stageLoading || finalizeLoading"
+        >
+          🗑️ Send to Trash
+        </button>
         <div v-if="loading" class="loading-message">Loading categories...</div>
         <div v-if="error" class="error-message">{{ error }}</div>
         <div v-if="stageError" class="error-message">{{ stageError }}</div>
@@ -53,7 +62,6 @@
             :disabled="stageLoading"
           >
             {{ category.name }}
-            <span v-if="category.category_id === suggestedCategoryId" class="suggest-badge">✨ Suggested</span>
           </button>
         </div>
         <div v-else-if="!loading && !error && !suggestLoading" class="no-data">
@@ -72,6 +80,10 @@
           <div v-if="finalizeError" class="error-message">{{ finalizeError }}</div>
           <div v-if="finalizeMessage" class="success-message">{{ finalizeMessage }}</div>
         </div>
+        <div v-if="discardDebugJson" class="debug-box">
+          <strong>Discard payload</strong>
+          <pre>{{ discardDebugJson }}</pre>
+        </div>
       </div>
     </div>
   <div v-else class="container">
@@ -83,7 +95,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
 import { categoryApi, labelApi, transactionApi } from '../api';
-import type { CategoryNameOwner, Transaction, User } from '../api';
+import { normalizeId } from '../utils/normalize';
+import type {
+  CategoryNameOwner,
+  DiscardLabelRequest,
+  StagedLabel,
+  Transaction,
+  TransactionInfoResponse,
+  User,
+} from '../api';
 
 const props = defineProps<{
   transaction: Transaction | null;
@@ -106,6 +126,10 @@ const finalizeMessage = ref<string | null>(null);
 const suggestedCategoryId = ref<string | null>(null);
 const suggestError = ref<string | null>(null);
 const suggestLoading = ref(false);
+const discardDebugPayload = ref<DiscardLabelRequest | null>(null);
+const discardDebugJson = computed(() =>
+  discardDebugPayload.value ? JSON.stringify(discardDebugPayload.value, null, 2) : ''
+);
 // Track if the current transaction was staged in this session
 const wasStagedHere = ref(false);
 
@@ -120,29 +144,29 @@ const sessionStagedTxIds = ref<Set<string>>(new Set());
 const activeTx = ref<Transaction | null>(null);
 const currentTx = computed(() => activeTx.value ?? props.transaction);
 
-const extractUserId = (value: unknown): string | null => {
-  if (!value) return null;
-  const candidate =
-    (value as any).user_id ??
-    (value as any).id ??
-    value;
-  if (candidate == null) return null;
-  if (typeof candidate === 'string') return candidate;
-  if (typeof candidate === 'object') {
-    const inner = (candidate as any).value;
-    if (typeof inner === 'string') return inner;
-    if (inner && typeof inner === 'object' && typeof inner.value === 'string') {
-      return inner.value;
-    }
-  }
-  try {
-    return String(candidate);
-  } catch {
-    return null;
-  }
-};
+const extractUserId = (value: unknown): string | null => normalizeId((value as any)?.user_id ?? (value as any)?.id ?? value);
 
 const userId = computed(() => extractUserId(props.user));
+
+const resolveTxIdValue = (value: unknown): string | null => normalizeId(value);
+
+const extractTxId = (tx: unknown): string | null => {
+  if (tx == null) return null;
+  if (typeof tx === 'string' || typeof tx === 'number' || typeof tx === 'bigint') {
+    return String(tx);
+  }
+  if (typeof tx === 'object') {
+    const obj = tx as Record<string, unknown>;
+    return (
+      resolveTxIdValue(obj.tx_id) ??
+      resolveTxIdValue(obj._id) ??
+      resolveTxIdValue(obj.id) ??
+      resolveTxIdValue(obj.transaction_id) ??
+      null
+    );
+  }
+  return null;
+};
 
 const visibleCategories = computed(() => {
   const uid = userId.value;
@@ -241,13 +265,19 @@ const stageCategory = async (category: CategoryNameOwner) => {
   stageError.value = null;
   stageMessage.value = null;
 
+  const txId = extractTxId(tx);
+  if (!txId) {
+    stageError.value = 'Transaction is missing a valid identifier.';
+    return;
+  }
+
   try {
-    const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${tx.tx_id}`;
+    const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${txId}`;
     const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
 
     const response = await labelApi.stage({
       user_id: uid,
-      tx_id: tx.tx_id,
+      tx_id: txId,
       tx_name: txName,
       tx_merchant: txMerchant,
       category_id: category.category_id,
@@ -255,7 +285,7 @@ const stageCategory = async (category: CategoryNameOwner) => {
 
     stageMessage.value = `Staged category "${category.name}". Click "Finalize Session" to complete.`;
     wasStagedHere.value = true;
-    sessionStagedTxIds.value.add(tx.tx_id);
+    sessionStagedTxIds.value.add(txId);
     // Auto-advance to the next transaction after successful staging
     nextTx();
   } catch (err) {
@@ -287,20 +317,82 @@ const finalizeLabeling = async () => {
   finalizeMessage.value = null;
 
   try {
-    // Finalize all staged labels (commits to permanent labels)
-    await labelApi.finalize({ user_id: uid });
-    
-    // Mark all transactions staged during this session as LABELED
-    const stagedIds = Array.from(sessionStagedTxIds.value);
-    for (const sId of stagedIds) {
+    let stagedPairs: Array<{ txId: string; categoryId: string }> = [];
+    let stagedIds: string[] = [];
+    try {
+      const stagedResponse = await labelApi.getStagedLabels({ user_id: uid });
+      const stagedList = Array.isArray(stagedResponse) ? (stagedResponse as StagedLabel[]) : [];
+      stagedPairs = stagedList
+        .map((entry) => {
+          if (!entry) return null;
+          const txId = resolveTxIdValue((entry as any).tx_id);
+          const categoryId = resolveTxIdValue((entry as any).category_id);
+          return txId && categoryId ? { txId, categoryId } : null;
+        })
+        .filter((pair): pair is { txId: string; categoryId: string } => pair !== null);
+      stagedIds = stagedPairs.map((pair) => pair.txId);
+    } catch (fetchErr) {
+      console.error('Failed to fetch staged labels before finalize', fetchErr);
+    }
+
+    // Fallback to locally tracked staged ids if server returned none
+    if (stagedIds.length === 0 && sessionStagedTxIds.value.size > 0) {
+      stagedIds = Array.from(sessionStagedTxIds.value);
+    }
+
+    // Deduplicate IDs to avoid double-marking
+    const uniqueIds = Array.from(new Set(stagedIds));
+    for (const sId of uniqueIds) {
       try {
         await transactionApi.markLabeled({ tx_id: sId, requester_id: uid });
       } catch (e) {
         console.warn('Failed to mark labeled for tx', sId, e);
       }
     }
-    finalizeMessage.value = stagedIds.length > 0
-      ? `Finalized ${stagedIds.length} labeled transaction(s).`
+
+    // Finalize all staged labels (commits to permanent labels)
+    await labelApi.finalize({ user_id: uid });
+
+    // Update category metrics for each staged tx/category pair
+    if (stagedPairs.length > 0) {
+      const uniquePairs = new Map<string, string>();
+      stagedPairs.forEach(({ txId, categoryId }) => {
+        if (!uniquePairs.has(txId)) {
+          uniquePairs.set(txId, categoryId);
+        }
+      });
+
+      const addTransactionsPromises = Array.from(uniquePairs.entries()).map(async ([txId, categoryId]) => {
+        try {
+          const txInfo = await transactionApi.getTxInfo({ owner_id: uid, tx_id: txId });
+          const amount = typeof txInfo?.amount === 'number' && Number.isFinite(txInfo.amount)
+            ? txInfo.amount
+            : Number(txInfo?.amount ?? 0) || 0;
+          const txDate = typeof txInfo?.date === 'string' && txInfo.date.length > 0
+            ? txInfo.date
+            : new Date().toISOString();
+
+          await categoryApi.addTransaction({
+            owner_id: uid,
+            category_id: categoryId,
+            tx_id: txId,
+            amount,
+            tx_date: txDate,
+          });
+        } catch (catErr) {
+          console.warn('Failed to add transaction to category metrics', { txId, categoryId }, catErr);
+        }
+      });
+
+      if (addTransactionsPromises.length > 0) {
+        await Promise.allSettled(addTransactionsPromises);
+      }
+    }
+
+    sessionStagedTxIds.value.clear();
+
+    finalizeMessage.value = uniqueIds.length > 0
+      ? `Finalized ${uniqueIds.length} labeled transaction(s).`
       : 'No transactions were staged; nothing to finalize.';
     
     // Navigate back to unlabeled list after brief delay
@@ -315,6 +407,53 @@ const finalizeLabeling = async () => {
   }
 };
 
+const discardCurrentTx = async () => {
+  const tx = currentTx.value;
+  const uid = userId.value;
+
+  if (stageLoading.value || finalizeLoading.value) return;
+  if (!uid || !tx) {
+    stageError.value = 'Missing user or transaction for discard.';
+    return;
+  }
+
+  stageLoading.value = true;
+  stageError.value = null;
+  stageMessage.value = null;
+
+  const txId = extractTxId(tx);
+  if (!txId) {
+    stageError.value = 'Transaction is missing a valid identifier.';
+    return;
+  }
+
+  try {
+    const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${txId}`;
+    const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
+
+    const payload: DiscardLabelRequest = {
+      user_id: uid,
+      tx_id: txId,
+      tx_name: txName,
+      tx_merchant: txMerchant,
+    };
+
+    discardDebugPayload.value = payload;
+
+    await labelApi.discard(payload);
+
+    stageMessage.value = 'Transaction staged for Trash.';
+    wasStagedHere.value = true;
+    sessionStagedTxIds.value.add(txId);
+    nextTx();
+  } catch (err) {
+    stageError.value = err instanceof Error ? err.message : 'Failed to discard transaction.';
+    console.error('Discard transaction error:', err);
+  } finally {
+    stageLoading.value = false;
+  }
+};
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -323,19 +462,7 @@ const formatCurrency = (value: number) => {
 };
 
 // Normalize various server shapes for owner_id to a string (copied from Unlabeled page)
-const extractOwnerId = (value: unknown): string => {
-  if (value == null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'object') {
-    const o = value as any
-    const candidate = o.value ?? o.id ?? o.user_id ?? o.owner_id
-    if (typeof candidate === 'string') return candidate
-    if (candidate != null) {
-      try { return String(candidate) } catch { /* noop */ }
-    }
-  }
-  try { return String(value) } catch { return '' }
-}
+const extractOwnerId = (value: unknown): string => normalizeId(value) ?? ''
 
 const fetchSessionTransactions = async () => {
   const uid = userId.value
@@ -345,8 +472,19 @@ const fetchSessionTransactions = async () => {
     const arr = Array.isArray(resp) ? resp : []
     // Filter to only current user and keep order
     sessionTransactions.value = arr
-      .map((t: any) => ({ ...t, owner_id: extractOwnerId(t?.owner_id) }))
-      .filter(t => t.owner_id === uid)
+      .map((t: any) => {
+        const normalizedId = extractTxId(t)
+        if (!normalizedId) return null
+        return {
+          ...t,
+          tx_id: normalizedId,
+          owner_id: extractOwnerId(t?.owner_id),
+        } as Transaction
+      })
+      .filter((item): item is Transaction => {
+        if (!item) return false
+        return item.owner_id === uid
+      })
   } catch (e) {
     console.error('Failed to fetch session transactions', e)
   }
@@ -495,6 +633,27 @@ h1 {
   text-align: center;
 }
 
+.btn-discard {
+  align-self: flex-start;
+  background: #ffe6e6;
+  color: #b22222;
+  border: 1px solid #f5c2c2;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-discard:hover:enabled {
+  background: #ffcccc;
+}
+
+.btn-discard:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .session-bar {
   display: flex;
   align-items: center;
@@ -615,5 +774,18 @@ h1 {
 .btn-finalize:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.debug-box {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px dashed #a0aec0;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

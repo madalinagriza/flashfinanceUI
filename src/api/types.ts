@@ -121,6 +121,55 @@ export interface CategoryNameResponse {
   name: string
 }
 
+export interface AddCategoryTransactionRequest {
+  owner_id: string
+  category_id: string
+  tx_id: string
+  amount: number
+  tx_date: string
+}
+
+export interface RemoveCategoryTransactionRequest {
+  owner_id: string
+  category_id: string
+  tx_id: string
+}
+
+export interface MoveTransactionToTrashRequest {
+  owner_id: string
+  from_category_id: string
+  tx_id: string
+}
+
+export interface ListCategoryTransactionsRequest {
+  owner_id: string
+  category_id: string
+}
+
+export interface CategoryTransactionEntry {
+  tx_id: string
+  amount: number
+  tx_date: string
+}
+
+export interface CategoryMetricPeriod {
+  startDate: string
+  endDate: string
+}
+
+export interface GetCategoryMetricStatsRequest {
+  owner_id: string
+  category_id: string
+  period: CategoryMetricPeriod
+}
+
+export interface CategoryMetricStatsResponse {
+  total_amount: number
+  transaction_count: number
+  average_per_day: number
+  days: number
+}
+
 // ===== Label Types =====
 export interface Label {
   _id: string
@@ -157,6 +206,13 @@ export interface RemoveLabelRequest {
   tx_id: string
 }
 
+export interface DiscardLabelRequest {
+  user_id: string
+  tx_id: string
+  tx_name: string
+  tx_merchant: string
+}
+
 export interface GetLabelRequest {
   user_id: string
   tx_id: string
@@ -170,6 +226,20 @@ export interface GetCategoryHistoryRequest {
 export interface HasLabelsForCategoryRequest {
   user_id: string
   category_id: string
+}
+
+export interface GetStagedLabelsRequest {
+  user_id: string
+}
+
+export interface StagedLabel {
+  _id?: string
+  user_id: string
+  category_id: string
+  tx_id: string
+  tx_name?: string
+  tx_merchant?: string
+  staged_at?: string
 }
 
 // ===== Response Types =====

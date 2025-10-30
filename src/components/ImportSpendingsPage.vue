@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { transactionApi } from '../api'
 import type { Transaction, User } from '../api'
+import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
   user: User | null
@@ -13,24 +14,16 @@ const emit = defineEmits<{
 const csvContent = ref('')
 const error = ref<string | null>(null)
 const loading = ref(false)
+const fileReading = ref(false)
+const lastFileName = ref<string | null>(null)
 const transactions = ref<Transaction[]>([])
 
 // Safely extract a string user id from various shapes
-const extractUserId = (u: any): string | null => {
-  if (!u) return null
-  const candidate = u.user_id ?? u.id ?? u
-  if (candidate == null) return null
-  if (typeof candidate === 'string') return candidate
-  if (typeof candidate === 'object') {
-    if (typeof candidate.value === 'string') return candidate.value
-    if (typeof candidate.value === 'object' && typeof candidate.value.value === 'string') return candidate.value.value
-  }
-  try { return String(candidate) } catch { return null }
-}
+const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
 
 const userId = computed(() => extractUserId(props.user))
 
-const handleUpload = async () => {
+const importCsvContent = async (content: string) => {
   error.value = null
   transactions.value = []
 
@@ -39,8 +32,8 @@ const handleUpload = async () => {
     error.value = 'You must be signed in to import transactions.'
     return
   }
-  if (!csvContent.value.trim()) {
-    error.value = 'Please paste your CSV content.'
+  if (!content.trim()) {
+    error.value = 'No CSV content found to import.'
     return
   }
 
@@ -48,7 +41,7 @@ const handleUpload = async () => {
   try {
     await transactionApi.importTransactions({
       owner_id: currentUserId,
-      fileContent: csvContent.value,
+      fileContent: content,
     })
     // On successful import, navigate to Unlabeled; that page refetches by user on mount.
     emit('navigate', 'unlabeled')
@@ -57,6 +50,35 @@ const handleUpload = async () => {
     console.error('Import error:', e)
   } finally {
     loading.value = false
+  }
+}
+
+const handleUpload = async () => {
+  await importCsvContent(csvContent.value)
+}
+
+const handleFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input?.files || input.files.length === 0) {
+    return
+  }
+
+  const file = input.files[0]
+  lastFileName.value = file?.name ?? null
+  fileReading.value = true
+  error.value = null
+
+  try {
+    const text = await file.text()
+    csvContent.value = text
+    await importCsvContent(text)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to read the selected file'
+    console.error('File import error:', e)
+  } finally {
+    fileReading.value = false
+    // Allow selecting the same file again if needed
+    input.value = ''
   }
 }
 </script>
@@ -68,8 +90,21 @@ const handleUpload = async () => {
     </div>
     <div class="container">
       <h1>Import Spendings</h1>
-      <p>Paste your CSV file content below to import your transactions.</p>
+      <p>Upload a CSV file or paste its contents below to import your transactions.</p>
       <form @submit.prevent="handleUpload" class="import-form">
+        <label class="file-picker">
+          <span class="file-picker-label">Select CSV file</span>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            @change="handleFileChange"
+            :disabled="loading || fileReading"
+          />
+        </label>
+        <div v-if="lastFileName" class="file-status">
+          Loaded: <strong>{{ lastFileName }}</strong>
+          <span v-if="fileReading">(reading…)</span>
+        </div>
         <textarea
           v-model="csvContent"
           placeholder="Paste CSV content here..."
@@ -77,8 +112,8 @@ const handleUpload = async () => {
           class="csv-textarea"
         ></textarea>
         <div v-if="error" class="error-message">❌ {{ error }}</div>
-        <button type="submit" class="btn-upload" :disabled="loading">
-          {{ loading ? 'Importing…' : 'Import CSV' }}
+        <button type="submit" class="btn-upload" :disabled="loading || fileReading">
+          {{ (loading || fileReading) ? 'Importing…' : 'Import CSV' }}
         </button>
       </form>
 
@@ -153,6 +188,39 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border: 1px dashed #ccd3e0;
+  border-radius: 6px;
+  background: #fff;
+  color: #3a4a63;
+  cursor: pointer;
+  align-self: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.file-picker:hover {
+  border-color: #667eea;
+  color: #2d3a58;
+}
+
+.file-picker input {
+  display: none;
+}
+
+.file-picker-label {
+  font-weight: 600;
+}
+
+.file-status {
+  font-size: 0.9rem;
+  color: #4a5568;
 }
 
 .csv-textarea {

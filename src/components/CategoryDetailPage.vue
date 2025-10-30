@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { CategoryNameOwner, User } from '../api'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { categoryApi, labelApi, transactionApi } from '../api'
+import { normalizeId } from '../utils/normalize'
+import type {
+  CategoryNameOwner,
+  CategoryTransactionEntry,
+  CategoryMetricStatsResponse,
+  TransactionInfoResponse,
+  User,
+} from '../api'
 
 const props = defineProps<{
   user: User | null
@@ -8,12 +16,348 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  navigate: [page: string]
+  (e: 'navigate', page: string): void
 }>()
 
-const categoryId = computed(() => props.category?.category_id ?? null)
+const transactionsState = reactive<
+  | { status: 'idle' | 'loading' }
+  | { status: 'loaded'; data: CategoryTransactionEntry[] }
+  | { status: 'error'; error: string }
+>({ status: 'idle' })
+
+const transactionsRaw = ref('')
+
+const metricsState = reactive<
+  | { status: 'idle' | 'loading' }
+  | { status: 'loaded'; data: CategoryMetricStatsResponse }
+  | { status: 'error'; error: string }
+>({ status: 'idle' })
+
+const allCategories = ref<CategoryNameOwner[]>([])
+const categoriesLoading = ref(false)
+const categoriesError = ref<string | null>(null)
+
+const moveState = reactive({
+  txId: null as string | null,
+  targetCategoryId: null as string | null,
+  loading: false,
+  error: null as string | null,
+  message: null as string | null,
+})
+
+const deleteState = reactive({
+  loading: false,
+  error: null as string | null,
+  message: null as string | null,
+})
+
+const ownerId = computed(() => normalizeId(props.category?.owner_id ?? props.user?.user_id) ?? null)
+const categoryId = computed(() => normalizeId(props.category?.category_id) ?? null)
 const categoryName = computed(() => props.category?.name ?? 'Unknown category')
-const ownerId = computed(() => props.category?.owner_id ?? props.user?.user_id ?? null)
+const moveTargets = computed(() =>
+  allCategories.value.filter(cat => cat.category_id !== categoryId.value)
+)
+const hasMoveTargets = computed(() => moveTargets.value.length > 0)
+
+const categoryNameById = (id: string | null | undefined) => {
+  if (!id) return ''
+  return allCategories.value.find(cat => cat.category_id === id)?.name ?? id
+}
+
+const thirtyDaysAgoIso = () => {
+  const now = new Date()
+  const then = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  return {
+    startDate: then.toISOString(),
+    endDate: now.toISOString(),
+  }
+}
+
+const fetchCategories = async () => {
+  if (!ownerId.value) {
+    allCategories.value = []
+    categoriesError.value = 'Missing owner id.'
+    categoriesLoading.value = false
+    return
+  }
+  categoriesLoading.value = true
+  categoriesError.value = null
+  try {
+    const categories = await categoryApi.getCategoriesWithNames(ownerId.value)
+    allCategories.value = categories.map(cat => ({
+      ...cat,
+      category_id: normalizeId(cat.category_id) ?? cat.category_id,
+      owner_id: normalizeId(cat.owner_id) ?? cat.owner_id,
+    }))
+  } catch (error: any) {
+    categoriesError.value = error?.message ?? 'Failed to load categories.'
+    console.error('CategoryDetail: failed to fetch categories', error)
+  } finally {
+    categoriesLoading.value = false
+  }
+}
+
+const loadTransactions = async () => {
+  if (!ownerId.value || !categoryId.value) {
+    transactionsState.status = 'error'
+    ;(transactionsState as any).error = 'Missing owner or category id.'
+    transactionsRaw.value = 'Missing owner or category id.'
+    return
+  }
+  transactionsState.status = 'loading'
+  transactionsRaw.value = 'Loading…'
+  try {
+    const data = await categoryApi.listTransactions({
+      owner_id: ownerId.value,
+      category_id: categoryId.value,
+    })
+    const normalized = data.map(entry => ({
+      ...entry,
+      tx_id: normalizeId(entry.tx_id) ?? entry.tx_id,
+    }))
+    transactionsState.status = 'loaded'
+    ;(transactionsState as any).data = normalized
+    transactionsRaw.value = JSON.stringify(normalized, null, 2)
+  } catch (error: any) {
+    transactionsState.status = 'error'
+    ;(transactionsState as any).error = error?.message ?? 'Failed to load history.'
+    try {
+      if (error?.response?.data) {
+        transactionsRaw.value = JSON.stringify(error.response.data, null, 2)
+      } else {
+        transactionsRaw.value = error?.message ?? 'Unknown error'
+      }
+    } catch {
+      transactionsRaw.value = error?.message ?? 'Unknown error'
+    }
+  }
+}
+
+const loadMetrics = async () => {
+  if (!ownerId.value || !categoryId.value) {
+    metricsState.status = 'error'
+    ;(metricsState as any).error = 'Missing owner or category id.'
+    return
+  }
+  metricsState.status = 'loading'
+  try {
+    const period = thirtyDaysAgoIso()
+    const result = await categoryApi.getMetricStats({
+      owner_id: ownerId.value,
+      category_id: categoryId.value,
+      period,
+    })
+    if (result) {
+      metricsState.status = 'loaded'
+      ;(metricsState as any).data = result
+    } else {
+      metricsState.status = 'error'
+      ;(metricsState as any).error = 'No metrics available.'
+    }
+  } catch (error: any) {
+    metricsState.status = 'error'
+    ;(metricsState as any).error = error?.message ?? 'Failed to load metrics.'
+  }
+}
+
+const openMove = (txId: string) => {
+  moveState.error = null
+  moveState.message = null
+  if (moveTargets.value.length === 0) {
+    moveState.error = 'You need another category to move this transaction.'
+    moveState.txId = null
+    moveState.targetCategoryId = null
+    return
+  }
+  moveState.txId = txId
+  const defaultTarget = moveTargets.value.find(cat => cat.category_id !== categoryId.value)
+  moveState.targetCategoryId = defaultTarget?.category_id ?? moveTargets.value[0]?.category_id ?? null
+}
+
+const cancelMove = () => {
+  moveState.txId = null
+  moveState.targetCategoryId = null
+  moveState.loading = false
+  moveState.error = null
+}
+
+const confirmMove = async () => {
+  if (!moveState.txId) {
+    moveState.error = 'Select a transaction to move.'
+    return
+  }
+  if (!moveState.targetCategoryId) {
+    moveState.error = 'Choose a destination category.'
+    return
+  }
+  if (!ownerId.value || !categoryId.value) {
+    moveState.error = 'Missing owner or category context.'
+    return
+  }
+
+  const owner = ownerId.value
+  const currentCategoryId = categoryId.value
+
+  moveState.loading = true
+  moveState.error = null
+  moveState.message = null
+
+  const txId = moveState.txId
+  const destinationId = moveState.targetCategoryId
+
+  try {
+    await labelApi.update({ user_id: owner, tx_id: txId, new_category_id: destinationId })
+
+    try {
+      await categoryApi.removeTransaction({
+        owner_id: owner,
+        category_id: currentCategoryId,
+        tx_id: txId,
+      })
+    } catch (removeErr: any) {
+      console.warn('CategoryDetail: failed to remove transaction from current category', removeErr)
+      const message = removeErr instanceof Error
+        ? removeErr.message
+        : removeErr?.response?.data?.error ?? 'Failed to remove transaction from current category.'
+      throw new Error(message)
+    }
+
+    let txInfo: TransactionInfoResponse | null = null
+    try {
+      txInfo = await transactionApi.getTxInfo({ owner_id: owner, tx_id: txId })
+    } catch (infoErr) {
+      console.warn('CategoryDetail: failed to fetch transaction info, falling back to defaults', infoErr)
+    }
+
+    const amount = typeof txInfo?.amount === 'number' && Number.isFinite(txInfo.amount)
+      ? txInfo.amount
+      : Number((txInfo as any)?.amount ?? 0) || 0
+    const txDate = typeof txInfo?.date === 'string' && txInfo.date.length > 0
+      ? txInfo.date
+      : new Date().toISOString()
+
+    await categoryApi.addTransaction({
+      owner_id: owner,
+      category_id: destinationId,
+      tx_id: txId,
+      amount,
+      tx_date: txDate,
+    })
+
+    moveState.message = `Moved transaction to ${categoryNameById(destinationId)}.`
+    cancelMove()
+
+    await loadTransactions()
+    await loadMetrics()
+    await fetchCategories()
+
+    if (moveState.message) {
+      setTimeout(() => {
+        moveState.message = null
+      }, 4000)
+    }
+  } catch (error: any) {
+    moveState.error = error?.message ?? 'Failed to move transaction.'
+    console.error('CategoryDetail: failed to move transaction', error)
+  } finally {
+    moveState.loading = false
+  }
+}
+
+const deleteTransaction = async (txId: string) => {
+  if (!ownerId.value || !categoryId.value) {
+    deleteState.error = 'Missing owner or category context.'
+    return
+  }
+
+  const owner = ownerId.value
+  const currentCategoryId = categoryId.value
+
+  const confirmed = window.confirm('Are you sure you want to delete this transaction from the category?')
+  if (!confirmed) return
+
+  deleteState.loading = true
+  deleteState.error = null
+  deleteState.message = null
+
+  try {
+    await labelApi.remove({ user_id: owner, tx_id: txId })
+
+    await categoryApi.moveTransactionToTrash({
+      owner_id: owner,
+      from_category_id: currentCategoryId,
+      tx_id: txId,
+    })
+
+    deleteState.message = 'Transaction moved to Trash.'
+
+    if (moveState.txId === txId) {
+      cancelMove()
+    }
+
+    await loadTransactions()
+    await loadMetrics()
+
+    setTimeout(() => {
+      deleteState.message = null
+    }, 4000)
+  } catch (error: any) {
+    deleteState.error = error?.message ?? 'Failed to delete transaction.'
+    console.error('CategoryDetail: failed to delete transaction', error)
+  } finally {
+    deleteState.loading = false
+  }
+}
+
+const formatDate = (iso: string) => {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString()
+}
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(amount ?? 0)
+
+onMounted(async () => {
+  if (!props.category) return
+  await fetchCategories()
+  await loadTransactions()
+  await loadMetrics()
+})
+
+watch(
+  () => ownerId.value,
+  (newOwner, oldOwner) => {
+    if (!newOwner || newOwner === oldOwner) return
+    fetchCategories()
+  }
+)
+
+watch(
+  () => [ownerId.value, categoryId.value] as const,
+  ([newOwner, newCategory], [oldOwner, oldCategory]) => {
+    if (!newOwner || !newCategory) return
+    if (newOwner !== oldOwner || newCategory !== oldCategory) {
+      loadTransactions()
+      loadMetrics()
+    }
+  }
+)
+
+watch(
+  moveTargets,
+  (newTargets) => {
+    if (moveState.txId == null) return
+    if (newTargets.length === 0) {
+      moveState.txId = null
+      moveState.targetCategoryId = null
+      moveState.error = 'You need another category to move this transaction.'
+      return
+    }
+    if (!newTargets.some(cat => cat.category_id === moveState.targetCategoryId)) {
+      moveState.targetCategoryId = newTargets[0]?.category_id ?? null
+    }
+  }
+)
 
 const goBack = () => {
   emit('navigate', 'categories')
@@ -34,6 +378,22 @@ const goBack = () => {
       </div>
 
       <div v-else class="content">
+        <div v-if="moveState.message" class="notice notice-success">
+          {{ moveState.message }}
+        </div>
+        <div v-if="moveState.error && !moveState.txId" class="notice notice-error">
+          {{ moveState.error }}
+        </div>
+        <div v-if="deleteState.message" class="notice notice-success">
+          {{ deleteState.message }}
+        </div>
+        <div v-if="deleteState.error" class="notice notice-error">
+          {{ deleteState.error }}
+        </div>
+        <div v-if="categoriesError" class="notice notice-error">
+          {{ categoriesError }}
+        </div>
+
         <header class="header">
           <div>
             <h1>{{ categoryName }}</h1>
@@ -45,39 +405,118 @@ const goBack = () => {
           </div>
         </header>
 
-        <section class="overview">
-          <h2>Getting Started</h2>
-          <p>
-            Track how this category performs over time. Future iterations will surface spending totals,
-            recent transactions, and trend lines right on this page.
-          </p>
-          <div class="cards">
-            <div class="card">
-              <span class="label">Status</span>
-              <span class="value">Ready</span>
-            </div>
-            <div class="card">
-              <span class="label">Owner</span>
-              <span class="value">{{ ownerId || 'n/a' }}</span>
-            </div>
-          </div>
+        <section class="metrics" v-if="metricsState.status === 'loaded'">
+          <h3>Last 30 Days</h3>
+          <ul>
+            <li><strong>Total amount:</strong> {{ formatCurrency(metricsState.data.total_amount) }}</li>
+            <li><strong>Transactions:</strong> {{ metricsState.data.transaction_count }}</li>
+            <li><strong>Average per day:</strong> {{ formatCurrency(metricsState.data.average_per_day) }}</li>
+            <li><strong>Days covered:</strong> {{ metricsState.data.days }}</li>
+          </ul>
         </section>
 
-        <section class="actions">
-          <h2>Next Steps</h2>
-          <p>Use the labeling flow to assign more transactions to this category.</p>
-          <div class="buttons">
-            <button class="btn-secondary" type="button" @click="emit('navigate', 'unlabeled')">
-              Label Transactions
-            </button>
-          </div>
+        <section class="metrics" v-else-if="metricsState.status === 'loading'">
+          <h3>Loading metrics…</h3>
+        </section>
+
+        <section class="metrics error" v-else-if="metricsState.status === 'error'">
+          <h3>Metrics unavailable</h3>
+          <p>{{ metricsState.error }}</p>
         </section>
 
         <section class="history">
-          <h2>What’s Coming</h2>
-          <p class="status empty">
-            Transaction history, budget metrics, and AI-powered insights will appear here soon.
-          </p>
+          <div class="history-header">
+            <h3>Transaction history</h3>
+            <span v-if="transactionsState.status === 'loaded'">
+              {{ transactionsState.data.length }} transaction<span v-if="transactionsState.data.length !== 1">s</span>
+            </span>
+          </div>
+
+          <div v-if="transactionsState.status === 'loading'" class="loading">
+            Loading transactions…
+          </div>
+
+          <div v-else-if="transactionsState.status === 'error'" class="error">
+            {{ transactionsState.error }}
+          </div>
+
+          <div v-else-if="transactionsState.status === 'loaded'">
+            <table v-if="transactionsState.data.length" class="history-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Transaction ID</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tx in transactionsState.data" :key="tx.tx_id">
+                  <td>{{ formatDate(tx.tx_date) }}</td>
+                  <td>{{ formatCurrency(tx.amount) }}</td>
+                  <td>{{ tx.tx_id }}</td>
+                  <td class="actions-cell">
+                    <div v-if="moveState.txId === tx.tx_id" class="move-controls">
+                      <label class="sr-only" :for="`move-select-${tx.tx_id}`">Select destination category</label>
+                      <select
+                        :id="`move-select-${tx.tx_id}`"
+                        v-model="moveState.targetCategoryId"
+                        :disabled="moveState.loading"
+                      >
+                        <option v-for="target in moveTargets" :key="target.category_id" :value="target.category_id">
+                          {{ target.name }}
+                        </option>
+                      </select>
+                      <div class="move-buttons">
+                        <button
+                          type="button"
+                          class="btn-confirm"
+                          @click="confirmMove"
+                          :disabled="moveState.loading || !moveState.targetCategoryId"
+                        >
+                          Move
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-cancel"
+                          @click="cancelMove"
+                          :disabled="moveState.loading"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p v-if="moveState.error" class="move-error">{{ moveState.error }}</p>
+                    </div>
+                    <div v-else class="actions-inline">
+                      <button
+                        type="button"
+                        class="btn-move"
+                        @click="openMove(tx.tx_id)"
+                        :disabled="!hasMoveTargets || moveState.loading || categoriesLoading || deleteState.loading"
+                        :title="!hasMoveTargets ? 'Create another category to enable moving.' : 'Move this transaction to another category.'"
+                      >
+                        Move
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-delete"
+                        @click="deleteTransaction(tx.tx_id)"
+                        :disabled="deleteState.loading || moveState.loading"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="empty">No transactions recorded for this category yet.</p>
+          </div>
+        </section>
+
+        <section class="debug" v-if="transactionsRaw">
+          <h3>Raw listTransactions response</h3>
+          <pre>{{ transactionsRaw }}</pre>
         </section>
       </div>
     </div>
@@ -133,7 +572,7 @@ const goBack = () => {
 .content {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .header {
@@ -167,55 +606,180 @@ const goBack = () => {
   border-radius: 4px;
 }
 
-.overview, .actions, .history {
+.metrics,
+.history {
   background: #fff;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
-}
-
-.cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.card {
-  flex: 1 1 240px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
   padding: 1.25rem;
-  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-.card .label {
-  font-size: 0.9rem;
-  opacity: 0.8;
+.metrics ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.card .value {
-  font-size: 2rem;
-  font-weight: 700;
+.metrics li + li {
+  margin-top: 0.5rem;
 }
 
-.actions .buttons {
-  margin-top: 1rem;
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
 }
 
-.btn-secondary {
-  padding: 0.75rem 2rem;
-  background: #22b8cf;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  text-align: left;
+  padding: 0.6rem 0.45rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.history-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.empty,
+.loading,
+.error {
+  color: #6b7280;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.debug {
+  background: #f8fafc;
+  border: 1px dashed #94a3b8;
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notice {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+}
+
+.notice-success {
+  background: #f0fff4;
+  border-color: #9ae6b4;
+  color: #22543d;
+}
+
+.notice-error {
+  background: #fff5f5;
+  border-color: #feb2b2;
+  color: #742a2a;
+}
+
+.actions-cell {
+  min-width: 160px;
+}
+
+.btn-move,
+.btn-confirm,
+.btn-cancel,
+.btn-delete {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.status {
-  color: #666;
+.btn-move {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
 }
 
-.status.empty {
-  color: #888;
+.btn-move:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.move-controls {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.move-controls select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e0;
+  font-size: 0.85rem;
+}
+
+.move-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-confirm {
+  background: #38a169;
+  border-color: #2f855a;
+  color: #fff;
+}
+
+.btn-confirm:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  color: #2d3748;
+}
+
+.btn-delete {
+  background: #fed7d7;
+  border-color: #feb2b2;
+  color: #9b2c2c;
+}
+
+.btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.move-error {
+  color: #c53030;
+  font-size: 0.8rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.actions-inline {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 </style>

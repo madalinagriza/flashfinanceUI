@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { categoryApi } from '../api'
 import type { User, CategoryNameOwner } from '../api'
+import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
   user: User | null
@@ -20,17 +21,7 @@ const addError = ref<string | null>(null)
 const newCategoryName = ref('')
 
 // Safely extract a string user id from various shapes
-const extractUserId = (u: any): string | null => {
-  if (!u) return null
-  const candidate = u.user_id ?? u.id ?? u
-  if (candidate == null) return null
-  if (typeof candidate === 'string') return candidate
-  if (typeof candidate === 'object') {
-    if (typeof candidate.value === 'string') return candidate.value
-    if (typeof candidate.value === 'object' && typeof candidate.value.value === 'string') return candidate.value.value
-  }
-  try { return String(candidate) } catch { return null }
-}
+const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
 
 const extractedUserId = computed(() => extractUserId(props.user))
 
@@ -66,17 +57,9 @@ const addCategory = async () => {
   }
   adding.value = true
   try {
-  // For debugging: build two payload variants and log them so we can inspect what is actually sent
-  const payloadObject = { owner_id: { value: newCategoryName.value.trim() }, name: newCategoryName.value.trim() }
-  const payloadString = { owner_id: newCategoryName.value.trim(), name: newCategoryName.value.trim() }
-  console.log('Create payload (object):', payloadObject)
-  console.log('Create payload (object) JSON:', JSON.stringify(payloadObject))
-  console.log('Create payload (string):', payloadString)
-
-  // Use the logged-in user's actual ID (extracted) as owner_id when creating the category
-  const ownerIdToSend = extractedUserId.value || ''
-  const createResp = await categoryApi.create({ owner_id: ownerIdToSend, name: newCategoryName.value.trim() } as any)
-  console.log('Create response (using logged-in user id):', createResp)
+    const ownerIdToSend = extractedUserId.value || ''
+    const createResp = await categoryApi.create({ owner_id: ownerIdToSend, name: newCategoryName.value.trim() })
+    console.debug('Create category response:', createResp)
     newCategoryName.value = ''
     await fetchCategories()
   } catch (e) {
@@ -118,14 +101,14 @@ const saveEdit = async (c: any, idx: number) => {
   const ownerId = extractedUserId.value || ''
   editStatus.value[idx] = 'Saving...'
   try {
-    const catId = (c as any).category_id || (c as any).categoryId || null
+  const catId = normalizeId((c as any).category_id ?? (c as any).categoryId)
     if (catId) {
       // Call rename endpoint
-      await categoryApi.rename({ owner_id: ownerId, category_id: catId, new_name: newName } as any)
+  await categoryApi.rename({ owner_id: ownerId, category_id: catId, new_name: newName })
       editStatus.value[idx] = 'Renamed.'
     } else {
       // Fallback: create a new category with the new name
-      await categoryApi.create({ owner_id: ownerId, name: newName } as any)
+  await categoryApi.create({ owner_id: ownerId, name: newName })
       editStatus.value[idx] = 'Created new category (rename not possible).' 
     }
     // Re-fetch the full category list and then filter for this owner to ensure

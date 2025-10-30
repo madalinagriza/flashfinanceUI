@@ -8,15 +8,16 @@ import type {
   CancelLabelRequest,
   UpdateLabelRequest,
   RemoveLabelRequest,
+  DiscardLabelRequest,
   GetLabelRequest,
-  GetTxInfoRequest,
+  GetStagedLabelsRequest,
+  StagedLabel,
   GetCategoryHistoryRequest,
   HasLabelsForCategoryRequest,
   SuggestLabelRequest,
   LabelTxIdResponse,
   HasLabelsResponse,
   SuggestLabelResponse,
-  TransactionInfoResponse,
   ListLabelsRequest,
 } from './types'
 
@@ -27,6 +28,14 @@ export const labelApi = {
    */
   async stage(request: StageLabelRequest): Promise<LabelTxIdResponse> {
     return apiClient.post<StageLabelRequest, LabelTxIdResponse>('/Label/stage', request)
+  },
+
+  /**
+   * POST /api/Label/discard
+   * Stages a transaction to be moved to the built-in Trash category.
+   */
+  async discard(request: DiscardLabelRequest): Promise<LabelTxIdResponse> {
+    return apiClient.post<DiscardLabelRequest, LabelTxIdResponse>('/Label/discard', request)
   },
 
   /**
@@ -65,16 +74,11 @@ export const labelApi = {
    * POST /api/Label/getLabel
    * Returns the label document for the given user and transaction.
    */
+  async getStagedLabels(request: GetStagedLabelsRequest): Promise<StagedLabel[]> {
+    return apiClient.post<GetStagedLabelsRequest, StagedLabel[]>('/Label/getStagedLabels', request)
+  },
   async getLabel(request: GetLabelRequest): Promise<Label[]> {
     return apiClient.post<GetLabelRequest, Label[]>('/Label/getLabel', request)
-  },
-
-  /**
-   * POST /api/Label/getTxInfo
-   * Returns the transaction info document for the given user and transaction.
-   */
-  async getTxInfo(request: GetTxInfoRequest): Promise<TransactionInfoResponse> {
-    return apiClient.post<GetTxInfoRequest, TransactionInfoResponse>('/Label/getTxInfo', request)
   },
 
   /**

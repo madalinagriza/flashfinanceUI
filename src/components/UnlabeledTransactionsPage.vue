@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { transactionApi, type User, type Transaction } from '../api'
+import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
   user: User | null
@@ -18,34 +19,12 @@ const retriedOnce = ref(false)
 const showDebug = ref(false)
 
 // Safely extract a string user id from various shapes (matches Categories page logic)
-const extractUserId = (u: any): string | null => {
-  if (!u) return null
-  const candidate = u.user_id ?? u.id ?? u
-  if (candidate == null) return null
-  if (typeof candidate === 'string') return candidate
-  if (typeof candidate === 'object') {
-    if (typeof candidate.value === 'string') return candidate.value
-    if (typeof candidate.value === 'object' && typeof candidate.value.value === 'string') return candidate.value.value
-  }
-  try { return String(candidate) } catch { return null }
-}
+const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
 
 const userId = computed(() => extractUserId(props.user))
 
 // Normalize various server shapes for owner_id to a string
-const extractOwnerId = (value: unknown): string => {
-  if (value == null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'object') {
-    const o = value as any
-    const candidate = o.value ?? o.id ?? o.user_id ?? o.owner_id
-    if (typeof candidate === 'string') return candidate
-    if (candidate != null) {
-      try { return String(candidate) } catch { /* fallthrough */ }
-    }
-  }
-  try { return String(value) } catch { return '' }
-}
+const extractOwnerId = (value: unknown): string => normalizeId(value) ?? ''
 
 // Guard against server-side filtering mistakes: only show items owned by this user
 const displayedTransactions = computed(() => {
