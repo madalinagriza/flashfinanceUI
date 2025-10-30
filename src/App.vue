@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import SignInPage from './components/SignInPage.vue'
 import RegisterPage from './components/RegisterPage.vue'
 import UsersPage from './components/UsersPage.vue'
+import UserAccountPage from './components/UserAccountPage.vue'
 import MainPage from './components/MainPage.vue'
 import ImportSpendingsPage from './components/ImportSpendingsPage.vue'
 import CategoriesPage from './components/CategoriesPage.vue'
@@ -15,6 +16,7 @@ type Page =
   | 'signin'
   | 'register'
   | 'users'
+  | 'userAccount'
   | 'main'
   | 'import'
   | 'categories'
@@ -26,6 +28,7 @@ const currentPage = ref<Page>('signin')
 const currentUser = ref<User | null>(null)
 const transactionToLabel = ref<Transaction | null>(null)
 const selectedCategory = ref<CategoryNameOwner | null>(null)
+const selectedAccountUser = ref<User | null>(null)
 
 const navigateTo = (page: Page | string) => {
   // A simple type guard to be safe
@@ -33,6 +36,7 @@ const navigateTo = (page: Page | string) => {
     'signin',
     'register',
     'users',
+    'userAccount',
     'main',
     'import',
     'categories',
@@ -44,6 +48,9 @@ const navigateTo = (page: Page | string) => {
     currentPage.value = page as Page;
     if (page === 'categories') {
       selectedCategory.value = null
+    }
+    if (page === 'users') {
+      selectedAccountUser.value = null
     }
   }
 }
@@ -67,6 +74,15 @@ const handleStartLabeling = (transaction: Transaction) => {
 const handleViewCategory = (category: CategoryNameOwner) => {
   selectedCategory.value = category
   currentPage.value = 'categoryDetail'
+}
+
+const handleViewAccount = (user: User) => {
+  selectedAccountUser.value = user
+  currentPage.value = 'userAccount'
+}
+
+const handleAccountUpdated = (user: User) => {
+  selectedAccountUser.value = user
 }
 </script>
 
@@ -107,12 +123,13 @@ const handleViewCategory = (category: CategoryNameOwner) => {
       @sign-in="handleSignIn"
     />
     <RegisterPage v-if="currentPage === 'register'" @navigate="navigateTo" />
-    <UsersPage v-if="currentPage === 'users'" @navigate="navigateTo" />
+  <UsersPage v-if="currentPage === 'users'" @navigate="navigateTo" @view-account="handleViewAccount" />
     <MainPage 
       v-if="currentPage === 'main'" 
       :user="currentUser" 
       @sign-out="handleSignOut"
       @navigate="navigateTo"
+      @view-account="handleViewAccount"
     />
     <ImportSpendingsPage v-if="currentPage === 'import'" :user="currentUser" @navigate="navigateTo" />
     <CategoriesPage
@@ -129,6 +146,13 @@ const handleViewCategory = (category: CategoryNameOwner) => {
     />
     <UnlabeledTransactionsPage v-if="currentPage === 'unlabeled'" :user="currentUser" @navigate="navigateTo" @start-labeling="handleStartLabeling" />
     <LabelingPage v-if="currentPage === 'labeling'" :transaction="transactionToLabel" :user="currentUser" @navigate="navigateTo" />
+    <UserAccountPage
+      v-if="currentPage === 'userAccount'"
+      :user="selectedAccountUser"
+      @navigate="navigateTo"
+      @user-updated="handleAccountUpdated"
+      @sign-out="handleSignOut"
+    />
   </div>
 </template>
 

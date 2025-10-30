@@ -5,23 +5,135 @@ import type { User } from '../api'
 
 const emit = defineEmits<{
   navigate: [page: string]
+  'view-account': [user: User]
 }>()
 
 const users = ref<User[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const actionMessage = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+const actionLoading = ref<Record<string, boolean>>({})
 
 const fetchUsers = async () => {
   loading.value = true
   error.value = null
+  actionMessage.value = null
+  actionError.value = null
   try {
-    users.value = await userApi.all()
+    const raw = await userApi.all()
+    // Normalize user_id which may be an object like { value: '...' }
+    const normalizeUserId = (id: any) => {
+      if (!id) return ''
+      if (typeof id === 'string') return id
+      if (typeof id === 'object' && 'value' in id) return String((id as any).value)
+      return String(id)
+    }
+
+    users.value = raw.map((u) => ({ ...u, user_id: normalizeUserId((u as any).user_id) }))
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to fetch users'
     console.error('Error fetching users:', e)
   } finally {
     loading.value = false
   }
+}
+
+const setActionLoading = (userId: string, value: boolean) => {
+  actionLoading.value = { ...actionLoading.value, [userId]: value }
+}
+
+const isActionLoading = (userId: string) => actionLoading.value[userId] === true
+
+const updateUserStatus = (userId: string, status: 'ACTIVE' | 'INACTIVE') => {
+  users.value = users.value.map((user) =>
+    user.user_id === userId ? { ...user, status } : user,
+  )
+}
+
+const clearActionAlerts = () => {
+  actionMessage.value = null
+  actionError.value = null
+}
+
+const handleDeactivate = async (user: User) => {
+  if (!window.confirm(`Deactivate ${user.name}?`)) {
+    return
+  }
+
+  clearActionAlerts()
+  setActionLoading(user.user_id, true)
+
+  try {
+    // Ensure we send the raw string id even if the user object contains an object wrapper
+    const resolveUserId = (u: any) => {
+      if (!u) return ''
+      if (typeof u === 'string') return u
+      if (typeof u === 'object' && 'value' in u) return String(u.value)
+      return String(u)
+    }
+
+    const uid = resolveUserId((user as any).user_id)
+    const payload = { user_id: uid }
+    // Debug: log payload sent to backend to help diagnose "User not found"
+    console.debug('[UsersPage] deactivate payload (normalized):', payload, 'original:', (user as any).user_id)
+    if (!payload.user_id) throw new Error('Missing user_id for deactivate')
+    await userApi.deactivate(payload)
+    updateUserStatus(uid, 'INACTIVE')
+    actionMessage.value = `${user.name} is now inactive`
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to deactivate user'
+    // Include payload context to help debugging (no secrets included)
+    const reportedId = (user as any)?.user_id?.value ?? (user as any)?.user_id ?? 'unknown'
+    actionError.value = `${message} (user_id=${reportedId})`
+    console.error('[UsersPage] Error deactivating user:', { error: e, sent_user: (user as any).user_id })
+  } finally {
+    const idForLoading = (user as any)?.user_id?.value ?? (user as any)?.user_id ?? ''
+    setActionLoading(String(idForLoading), false)
+  }
+}
+
+const handleReactivate = async (user: User) => {
+  clearActionAlerts()
+
+  const newPassword = window.prompt(
+    `Enter a new password to reactivate ${user.name}`,
+    '',
+  )
+
+  if (newPassword === null) {
+    return
+  }
+
+  const trimmedPassword = newPassword.trim()
+
+  if (trimmedPassword.length < 8) {
+    actionError.value = 'Password must be at least 8 characters long'
+    return
+  }
+
+  const idForLoading = (user as any)?.user_id?.value ?? (user as any)?.user_id ?? ''
+  setActionLoading(String(idForLoading), true)
+
+  try {
+    const payload = { email: user.email, new_password: trimmedPassword }
+    console.debug('[UsersPage] reactivate payload:', { ...payload, new_password: '***' })
+    if (!payload.email) throw new Error('Missing email for reactivate')
+    await userApi.reactivate(payload)
+    const uid = (user as any)?.user_id?.value ?? (user as any)?.user_id ?? ''
+    updateUserStatus(String(uid), 'ACTIVE')
+    actionMessage.value = `${user.name} has been reactivated`
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to reactivate user'
+    actionError.value = message
+    console.error('[UsersPage] Error reactivating user:', { error: e, email: user.email })
+  } finally {
+    setActionLoading(String(idForLoading), false)
+  }
+}
+
+const handleViewAccount = (user: User) => {
+  emit('view-account', user)
 }
 
 // Fetch users when component mounts
@@ -49,6 +161,14 @@ onMounted(() => {
 
       <div v-if="error" class="error-message">
         ❌ {{ error }}
+      </div>
+
+      <div v-if="actionError" class="error-message">
+        ❌ {{ actionError }}
+      </div>
+
+      <div v-if="actionMessage" class="success-message">
+        ✅ {{ actionMessage }}
       </div>
 
       <div v-if="!loading && users.length === 0 && !error" class="empty-state">
@@ -85,6 +205,30 @@ onMounted(() => {
                 {{ user.status }}
               </span>
             </div>
+          </div>
+          <div class="user-actions">
+            <button
+              class="btn-view"
+              @click="handleViewAccount(user)"
+            >
+              View Account
+            </button>
+            <button
+              v-if="user.status === 'ACTIVE'"
+              class="btn-deactivate"
+              @click="handleDeactivate(user)"
+              :disabled="isActionLoading(user.user_id)"
+            >
+              {{ isActionLoading(user.user_id) ? 'Deactivating...' : 'Deactivate' }}
+            </button>
+            <button
+              v-else
+              class="btn-reactivate"
+              @click="handleReactivate(user)"
+              :disabled="isActionLoading(user.user_id)"
+            >
+              {{ isActionLoading(user.user_id) ? 'Reactivating...' : 'Reactivate' }}
+            </button>
           </div>
         </div>
       </div>
@@ -172,6 +316,15 @@ h1 {
   border: 1px solid #fcc;
   border-radius: 4px;
   color: #c33;
+  margin-bottom: 1rem;
+}
+
+.success-message {
+  padding: 1rem;
+  background: #e6ffed;
+  border: 1px solid #b7f5c3;
+  border-radius: 4px;
+  color: #1b5e20;
   margin-bottom: 1rem;
 }
 
@@ -299,6 +452,67 @@ h1 {
 .status-badge.inactive {
   background: #f8d7da;
   color: #721c24;
+}
+
+.user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.btn-view,
+.btn-deactivate,
+.btn-reactivate {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.btn-view {
+  background: #e7f1ff;
+  color: #1d4ed8;
+}
+
+.btn-view:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-deactivate {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.btn-deactivate:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-reactivate {
+  background: #d4edda;
+  color: #155724;
+}
+
+.btn-reactivate:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-deactivate:disabled,
+.btn-reactivate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-view:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .footer {

@@ -48,8 +48,15 @@ const handleSignIn = async () => {
       emit('signIn', user)
     }, 1000)
   } catch (e) {
-    error.value = 'Authentication Failed: Invalid email or password'
-    console.error('Sign in error:', e)
+    // Normalize server message and strip common prefixes
+    let serverMsgRaw = e instanceof Error ? e.message : String(e)
+    if (!serverMsgRaw) serverMsgRaw = String(e)
+    // Strip leading "Error: " if present
+    const serverMsg = serverMsgRaw.replace(/^Error:\s*/i, '').trim()
+    console.error('Sign in error:', { error: e, serverMsgRaw, serverMsg })
+
+    // Unified error message for any authentication failure
+    error.value = 'Error Authenticating: Incorrect credentials or account is deactivated. Contact Administrator if issue persists'
   } finally {
     loading.value = false
   }

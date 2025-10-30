@@ -80,10 +80,6 @@
           <div v-if="finalizeError" class="error-message">{{ finalizeError }}</div>
           <div v-if="finalizeMessage" class="success-message">{{ finalizeMessage }}</div>
         </div>
-        <div v-if="discardDebugJson" class="debug-box">
-          <strong>Discard payload</strong>
-          <pre>{{ discardDebugJson }}</pre>
-        </div>
       </div>
     </div>
   <div v-else class="container">
@@ -126,10 +122,6 @@ const finalizeMessage = ref<string | null>(null);
 const suggestedCategoryId = ref<string | null>(null);
 const suggestError = ref<string | null>(null);
 const suggestLoading = ref(false);
-const discardDebugPayload = ref<DiscardLabelRequest | null>(null);
-const discardDebugJson = computed(() =>
-  discardDebugPayload.value ? JSON.stringify(discardDebugPayload.value, null, 2) : ''
-);
 // Track if the current transaction was staged in this session
 const wasStagedHere = ref(false);
 
@@ -234,7 +226,17 @@ const fetchSuggestion = async () => {
 
     console.debug('Suggest response:', suggestion);
 
-    suggestedCategoryId.value = suggestion.id;
+    const resolvedId = normalizeId((suggestion as any)?.id ?? (suggestion as any)?.category_id ?? suggestion) ?? null;
+    const matchFound = !!resolvedId && visibleCategories.value.some(cat => cat.category_id === resolvedId);
+
+    if (resolvedId) {
+      suggestedCategoryId.value = resolvedId;
+      if (!matchFound) {
+        suggestError.value = 'Suggestion refers to a category that is not in your list.';
+      }
+    } else {
+      suggestError.value = 'Suggestion response missing a valid category id.';
+    }
   } catch (err) {
     suggestError.value = err instanceof Error ? err.message : 'Failed to get suggestion.';
     console.error('Fetch suggestion error:', err);
@@ -437,8 +439,6 @@ const discardCurrentTx = async () => {
       tx_name: txName,
       tx_merchant: txMerchant,
     };
-
-    discardDebugPayload.value = payload;
 
     await labelApi.discard(payload);
 

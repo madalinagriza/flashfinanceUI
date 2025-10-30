@@ -10,6 +10,8 @@ import type {
   User,
 } from '../api'
 
+type CategoryHistoryRow = CategoryTransactionEntry & { display_name?: string }
+
 const props = defineProps<{
   user: User | null
   category: CategoryNameOwner | null
@@ -21,7 +23,7 @@ const emit = defineEmits<{
 
 const transactionsState = reactive<
   | { status: 'idle' | 'loading' }
-  | { status: 'loaded'; data: CategoryTransactionEntry[] }
+  | { status: 'loaded'; data: CategoryHistoryRow[] }
   | { status: 'error'; error: string }
 >({ status: 'idle' })
 
@@ -32,6 +34,31 @@ const metricsState = reactive<
   | { status: 'loaded'; data: CategoryMetricStatsResponse }
   | { status: 'error'; error: string }
 >({ status: 'idle' })
+
+const metricsRaw = ref('')
+const metricsFilterError = ref<string | null>(null)
+
+const DEFAULT_METRICS_END = '2025-10-30'
+const DEFAULT_METRICS_START = '2024-10-30'
+
+const metricsStartDate = ref('')
+const metricsEndDate = ref('')
+
+const initializeMetricsPeriod = () => {
+  metricsStartDate.value = DEFAULT_METRICS_START
+  metricsEndDate.value = DEFAULT_METRICS_END
+  metricsFilterError.value = null
+}
+
+const buildPeriod = () => {
+  if (!metricsStartDate.value || !metricsEndDate.value) return null
+  const startIso = `${metricsStartDate.value}T00:00:00.000Z`
+  const endIso = `${metricsEndDate.value}T23:59:59.999Z`
+  return {
+    startDate: new Date(startIso).toISOString(),
+    endDate: new Date(endIso).toISOString(),
+  }
+}
 
 const allCategories = ref<CategoryNameOwner[]>([])
 const categoriesLoading = ref(false)
@@ -62,15 +89,6 @@ const hasMoveTargets = computed(() => moveTargets.value.length > 0)
 const categoryNameById = (id: string | null | undefined) => {
   if (!id) return ''
   return allCategories.value.find(cat => cat.category_id === id)?.name ?? id
-}
-
-const thirtyDaysAgoIso = () => {
-  const now = new Date()
-  const then = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  return {
-    startDate: then.toISOString(),
-    endDate: now.toISOString(),
-  }
 }
 
 const fetchCategories = async () => {
@@ -115,9 +133,26 @@ const loadTransactions = async () => {
       ...entry,
       tx_id: normalizeId(entry.tx_id) ?? entry.tx_id,
     }))
+    const enriched = await Promise.all(
+      normalized.map(async entry => {
+        if (!entry.tx_id || !ownerId.value) {
+          return { ...entry, display_name: entry.tx_id }
+        }
+        try {
+          const info = await transactionApi.getTxInfo({ owner_id: ownerId.value, tx_id: entry.tx_id })
+          const displayName = (info as any)?.tx_name
+            ?? (info as any)?.merchant_text
+            ?? entry.tx_id
+          return { ...entry, display_name: displayName }
+        } catch (infoErr) {
+          console.warn('CategoryDetail: failed to fetch transaction info for history row', entry.tx_id, infoErr)
+          return { ...entry, display_name: entry.tx_id }
+        }
+      })
+    )
     transactionsState.status = 'loaded'
-    ;(transactionsState as any).data = normalized
-    transactionsRaw.value = JSON.stringify(normalized, null, 2)
+    ;(transactionsState as any).data = enriched
+    transactionsRaw.value = JSON.stringify(enriched, null, 2)
   } catch (error: any) {
     transactionsState.status = 'error'
     ;(transactionsState as any).error = error?.message ?? 'Failed to load history.'
@@ -137,27 +172,63 @@ const loadMetrics = async () => {
   if (!ownerId.value || !categoryId.value) {
     metricsState.status = 'error'
     ;(metricsState as any).error = 'Missing owner or category id.'
+    metricsRaw.value = 'Missing owner or category id.'
     return
   }
+  const period = buildPeriod()
+  if (!period) {
+    metricsFilterError.value = 'Select both start and end dates.'
+    metricsRaw.value = 'Missing start/end date.'
+    return
+  }
+  if (new Date(period.startDate).getTime() > new Date(period.endDate).getTime()) {
+    metricsFilterError.value = 'Start date must be before end date.'
+    metricsRaw.value = JSON.stringify({ requestPayload: { owner_id: ownerId.value, category_id: categoryId.value, period }, error: 'Start date after end date.' }, null, 2)
+    return
+  }
+
+  metricsFilterError.value = null
   metricsState.status = 'loading'
+  metricsRaw.value = 'Loading…'
+  const requestPayload = {
+    owner_id: ownerId.value,
+    category_id: categoryId.value,
+    period,
+  }
   try {
-    const period = thirtyDaysAgoIso()
-    const result = await categoryApi.getMetricStats({
-      owner_id: ownerId.value,
-      category_id: categoryId.value,
-      period,
-    })
-    if (result) {
-      metricsState.status = 'loaded'
-      ;(metricsState as any).data = result
-    } else {
-      metricsState.status = 'error'
-      ;(metricsState as any).error = 'No metrics available.'
-    }
+    const result = await categoryApi.getMetricStats(requestPayload)
+    metricsState.status = 'loaded'
+    ;(metricsState as any).data = result
+    metricsRaw.value = JSON.stringify({ requestPayload, response: result }, null, 2)
   } catch (error: any) {
     metricsState.status = 'error'
     ;(metricsState as any).error = error?.message ?? 'Failed to load metrics.'
+    try {
+      if (error?.response?.data) {
+        metricsRaw.value = JSON.stringify(
+          { requestPayload, error: error.response.data },
+          null,
+          2
+        )
+      } else {
+        metricsRaw.value = JSON.stringify(
+          { requestPayload, error: error?.message ?? 'Unknown metrics error' },
+          null,
+          2
+        )
+      }
+    } catch {
+      metricsRaw.value = JSON.stringify(
+        { requestPayload, error: error?.message ?? 'Unknown metrics error' },
+        null,
+        2
+      )
+    }
   }
+}
+
+const applyMetricsFilters = async () => {
+  await loadMetrics()
 }
 
 const openMove = (txId: string) => {
@@ -319,6 +390,7 @@ const formatCurrency = (amount: number) =>
 
 onMounted(async () => {
   if (!props.category) return
+  initializeMetricsPeriod()
   await fetchCategories()
   await loadTransactions()
   await loadMetrics()
@@ -405,23 +477,36 @@ const goBack = () => {
           </div>
         </header>
 
-        <section class="metrics" v-if="metricsState.status === 'loaded'">
-          <h3>Last 30 Days</h3>
-          <ul>
+        <section class="metrics">
+          <div class="metrics-header">
+            <div>
+              <h3>Category Metrics</h3>
+              <p class="subtitle">Select a custom period to recalculate totals.</p>
+            </div>
+            <form class="metrics-filter" @submit.prevent="applyMetricsFilters">
+              <label>
+                <span>Start date</span>
+                <input type="date" v-model="metricsStartDate" />
+              </label>
+              <label>
+                <span>End date</span>
+                <input type="date" v-model="metricsEndDate" />
+              </label>
+              <button type="submit" class="btn-apply" :disabled="metricsState.status === 'loading'">
+                {{ metricsState.status === 'loading' ? 'Loading…' : 'Apply' }}
+              </button>
+            </form>
+          </div>
+          <p v-if="metricsFilterError" class="metrics-error">{{ metricsFilterError }}</p>
+
+          <div v-if="metricsState.status === 'loading'" class="metrics-loading">Loading metrics…</div>
+          <div v-else-if="metricsState.status === 'error'" class="metrics-error">{{ metricsState.error }}</div>
+          <ul v-else-if="metricsState.status === 'loaded'" class="metrics-list">
             <li><strong>Total amount:</strong> {{ formatCurrency(metricsState.data.total_amount) }}</li>
             <li><strong>Transactions:</strong> {{ metricsState.data.transaction_count }}</li>
             <li><strong>Average per day:</strong> {{ formatCurrency(metricsState.data.average_per_day) }}</li>
             <li><strong>Days covered:</strong> {{ metricsState.data.days }}</li>
           </ul>
-        </section>
-
-        <section class="metrics" v-else-if="metricsState.status === 'loading'">
-          <h3>Loading metrics…</h3>
-        </section>
-
-        <section class="metrics error" v-else-if="metricsState.status === 'error'">
-          <h3>Metrics unavailable</h3>
-          <p>{{ metricsState.error }}</p>
         </section>
 
         <section class="history">
@@ -446,7 +531,7 @@ const goBack = () => {
                 <tr>
                   <th>Date</th>
                   <th>Amount</th>
-                  <th>Transaction ID</th>
+                  <th>Transaction</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -454,7 +539,12 @@ const goBack = () => {
                 <tr v-for="tx in transactionsState.data" :key="tx.tx_id">
                   <td>{{ formatDate(tx.tx_date) }}</td>
                   <td>{{ formatCurrency(tx.amount) }}</td>
-                  <td>{{ tx.tx_id }}</td>
+                  <td>
+                    <div class="tx-name">{{ tx.display_name || tx.tx_id }}</div>
+                    <div class="tx-id" v-if="tx.display_name && tx.display_name !== tx.tx_id">
+                      <code>{{ tx.tx_id }}</code>
+                    </div>
+                  </td>
                   <td class="actions-cell">
                     <div v-if="moveState.txId === tx.tx_id" class="move-controls">
                       <label class="sr-only" :for="`move-select-${tx.tx_id}`">Select destination category</label>
@@ -514,9 +604,16 @@ const goBack = () => {
           </div>
         </section>
 
-        <section class="debug" v-if="transactionsRaw">
-          <h3>Raw listTransactions response</h3>
-          <pre>{{ transactionsRaw }}</pre>
+        <section class="debug" v-if="transactionsRaw || metricsRaw">
+          <h3>Debug Responses</h3>
+          <div v-if="metricsRaw" class="debug-block">
+            <h4>getMetricStats</h4>
+            <pre>{{ metricsRaw }}</pre>
+          </div>
+          <div v-if="transactionsRaw" class="debug-block">
+            <h4>listTransactions</h4>
+            <pre>{{ transactionsRaw }}</pre>
+          </div>
         </section>
       </div>
     </div>
@@ -615,6 +712,74 @@ const goBack = () => {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
+.metrics-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.metrics-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.metrics-filter label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: #4a5568;
+  gap: 0.35rem;
+}
+
+.metrics-filter input[type="date"] {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.btn-apply {
+  padding: 0.45rem 0.9rem;
+  background: #3182ce;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-apply:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.metrics-error {
+  color: #b83280;
+  background: #fff5f7;
+  border: 1px solid #fed7e2;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.metrics-loading {
+  color: #4a5568;
+  font-size: 0.95rem;
+}
+
+.metrics-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
 .metrics ul {
   list-style: none;
   padding: 0;
@@ -648,6 +813,16 @@ const goBack = () => {
   background: #f9fafb;
 }
 
+.tx-name {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.tx-id {
+  font-size: 0.8rem;
+  color: #718096;
+}
+
 .empty,
 .loading,
 .error {
@@ -667,6 +842,10 @@ const goBack = () => {
   font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.debug-block + .debug-block {
+  margin-top: 1rem;
 }
 
 .notice {

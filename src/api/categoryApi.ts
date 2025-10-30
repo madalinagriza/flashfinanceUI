@@ -22,7 +22,13 @@ import type {
   CategoryMetricStatsResponse,
 } from './types'
 
+let latestMetricStatsRaw: unknown = null
+
 export const categoryApi = {
+  getLatestMetricStatsRaw(): unknown {
+    return latestMetricStatsRaw
+  },
+
   /**
    * POST /api/Category/create
    * Creates a new category for a given user with a specified name.
@@ -165,11 +171,81 @@ export const categoryApi = {
     return Array.isArray(res) ? (res as CategoryTransactionEntry[]) : []
   },
 
-  async getMetricStats(payload: GetCategoryMetricStatsRequest): Promise<CategoryMetricStatsResponse | null> {
+  async getMetricStats(payload: GetCategoryMetricStatsRequest): Promise<CategoryMetricStatsResponse> {
     const res = await apiClient.post('/Category/getMetricStats', payload)
-    if (res && typeof res === 'object' && 'total_amount' in res) {
-      return res as CategoryMetricStatsResponse
+    latestMetricStatsRaw = res
+    console.debug('categoryApi.getMetricStats raw response:', res)
+
+    const parseNumericValue = (raw: unknown, fallback = 0): number => {
+      if (raw == null) return fallback
+      if (typeof raw === 'number') return Number.isFinite(raw) ? raw : fallback
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim()
+        if (!trimmed) return fallback
+        const coerced = Number(trimmed)
+        return Number.isFinite(coerced) ? coerced : fallback
+      }
+      if (typeof raw === 'object') {
+        const obj = raw as Record<string, unknown>
+        const nestedCandidates: unknown[] = [
+          obj.$numberDecimal,
+          obj.$numberDouble,
+          obj.$numberInt,
+          obj.$numberLong,
+          obj.value,
+          obj.amount,
+        ]
+
+        for (const candidate of nestedCandidates) {
+          const parsed = parseNumericValue(candidate, NaN)
+          if (Number.isFinite(parsed)) return parsed
+        }
+
+        if (Array.isArray(raw)) {
+          for (const entry of raw) {
+            const parsed = parseNumericValue(entry, NaN)
+            if (Number.isFinite(parsed)) return parsed
+          }
+        }
+      }
+
+      return fallback
     }
-    return null
+
+    const normalizeMetrics = (value: any): CategoryMetricStatsResponse | null => {
+      if (!value || typeof value !== 'object') return null
+
+      return {
+        total_amount: parseNumericValue((value as any).total_amount),
+        transaction_count: parseNumericValue((value as any).transaction_count),
+        average_per_day: parseNumericValue((value as any).average_per_day),
+        days: parseNumericValue((value as any).days, 0),
+      }
+    }
+
+    if (Array.isArray(res)) {
+      for (const entry of res) {
+        const normalized = normalizeMetrics(entry)
+        if (normalized) return normalized
+      }
+      console.warn('getMetricStats: array response without usable metrics', res)
+      return {
+        total_amount: 0,
+        transaction_count: 0,
+        average_per_day: 0,
+        days: 0,
+      }
+    }
+
+    const direct = normalizeMetrics(res)
+    if (direct) return direct
+
+    console.warn('getMetricStats: unexpected response shape', res)
+    return {
+      total_amount: 0,
+      transaction_count: 0,
+      average_per_day: 0,
+      days: 0,
+    }
   },
 }

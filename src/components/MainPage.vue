@@ -9,6 +9,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   signOut: []
   navigate: [page: string]
+  'view-account': [user: User]
 }>()
 </script>
 
@@ -51,8 +52,25 @@ const emit = defineEmits<{
             <span class="label">User ID:</span>
             <span class="value">{{ user.user_id }}</span>
           </div>
+          <button class="btn-account" @click="emit('view-account', user)">View Personal Account Page</button>
         </div>
       </div>
+.btn-account {
+  display: block;
+  margin: 1.5rem auto 0 auto;
+  padding: 0.7rem 2rem;
+  background: #e7f1ff;
+  color: #1d4ed8;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.btn-account:hover {
+  background: #c7e0ff;
+}
 
       <button @click="emit('navigate', 'import')" class="btn-primary">
         Import Transactions
