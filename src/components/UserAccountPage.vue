@@ -143,7 +143,7 @@ const handleChangePassword = async () => {
 <template>
   <div class="account-page" v-if="accountUser">
     <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'users')">← Back to Users</button>
+      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
     </div>
 
     <div class="container">
@@ -232,8 +232,8 @@ const handleChangePassword = async () => {
     </div>
   </div>
   <div v-else class="missing-user">
-    <p>No user selected. Please return to the users list.</p>
-    <button class="btn-primary" @click="emit('navigate', 'users')">Back to Users</button>
+    <p>No user selected. Please return to the main page.</p>
+    <button class="btn-primary" @click="emit('navigate', 'main')">Back to Home</button>
   </div>
 </template>
 

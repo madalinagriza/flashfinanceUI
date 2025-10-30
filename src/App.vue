@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import SignInPage from './components/SignInPage.vue'
 import RegisterPage from './components/RegisterPage.vue'
-import UsersPage from './components/UsersPage.vue'
 import UserAccountPage from './components/UserAccountPage.vue'
 import MainPage from './components/MainPage.vue'
 import ImportSpendingsPage from './components/ImportSpendingsPage.vue'
@@ -15,7 +14,6 @@ import type { CategoryNameOwner, Transaction, User } from './api'
 type Page =
   | 'signin'
   | 'register'
-  | 'users'
   | 'userAccount'
   | 'main'
   | 'import'
@@ -35,7 +33,6 @@ const navigateTo = (page: Page | string) => {
   const validPages: (Page | string)[] = [
     'signin',
     'register',
-    'users',
     'userAccount',
     'main',
     'import',
@@ -48,9 +45,6 @@ const navigateTo = (page: Page | string) => {
     currentPage.value = page as Page;
     if (page === 'categories') {
       selectedCategory.value = null
-    }
-    if (page === 'users') {
-      selectedAccountUser.value = null
     }
   }
 }
@@ -106,13 +100,7 @@ const handleAccountUpdated = (user: User) => {
           >
             Register
           </button>
-          <button 
-            @click="navigateTo('users')" 
-            :class="{ active: currentPage === 'users' }"
-            class="nav-btn"
-          >
-            View Users
-          </button>
+          
         </div>
       </div>
     </nav>
@@ -123,7 +111,6 @@ const handleAccountUpdated = (user: User) => {
       @sign-in="handleSignIn"
     />
     <RegisterPage v-if="currentPage === 'register'" @navigate="navigateTo" />
-  <UsersPage v-if="currentPage === 'users'" @navigate="navigateTo" @view-account="handleViewAccount" />
     <MainPage 
       v-if="currentPage === 'main'" 
       :user="currentUser" 
