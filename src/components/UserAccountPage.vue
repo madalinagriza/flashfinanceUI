@@ -17,6 +17,8 @@ const accountUser = ref<User | null>(null)
 const deactivateState = reactive({ loading: false, message: null as string | null, error: null as string | null })
 const passwordState = reactive({ loading: false, message: null as string | null, error: null as string | null })
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+// Suggestion preference (persisted locally per-user)
+const suggestPref = reactive({ enabled: true, message: null as string | null })
 
 watch(
   () => props.user,
@@ -42,6 +44,39 @@ watch(
   },
   { immediate: true },
 )
+
+// Load persisted suggest-AI preference for the current account when user changes
+watch(
+  () => accountUser.value?.user_id,
+  (uid) => {
+    if (!uid) return
+    try {
+      const key = `suggestAi_${uid}`
+      const raw = localStorage.getItem(key)
+      // default to true if not set (preserve existing behavior)
+      suggestPref.enabled = raw == null ? true : raw === 'true'
+      suggestPref.message = null
+    } catch (e) {
+      console.error('Failed to load suggest-AI preference', e)
+      suggestPref.enabled = true
+    }
+  },
+  { immediate: true },
+)
+
+const toggleSuggestPref = () => {
+  const uid = accountUser.value?.user_id
+  if (!uid) return
+  try {
+    const key = `suggestAi_${uid}`
+    localStorage.setItem(key, suggestPref.enabled ? 'true' : 'false')
+    suggestPref.message = suggestPref.enabled ? 'AI suggestions enabled.' : 'AI suggestions disabled.'
+    setTimeout(() => (suggestPref.message = null), 2500)
+  } catch (e) {
+    console.error('Failed to persist suggest-AI preference', e)
+    suggestPref.message = 'Unable to save preference locally.'
+  }
+}
 
 const canDeactivate = computed(() => accountUser.value?.status === 'ACTIVE' && !deactivateState.loading)
 const statusBadgeClass = computed(() => accountUser.value?.status.toLowerCase() ?? '')
@@ -228,6 +263,20 @@ const handleChangePassword = async () => {
             {{ passwordState.loading ? 'Updating...' : 'Change Password' }}
           </button>
         </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Preferences</h2>
+          <p>Control labeling suggestions powered by AI.</p>
+        </div>
+        <div class="preference-row">
+          <label class="form-field" style="flex-direction:row;align-items:center;gap:0.75rem">
+            <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
+            <span>Suggest categories with AI</span>
+          </label>
+          <div v-if="suggestPref.message" class="alert" :class="{ success: suggestPref.message.includes('enabled'), error: suggestPref.message.includes('Unable') }">{{ suggestPref.message }}</div>
+        </div>
       </section>
     </div>
   </div>

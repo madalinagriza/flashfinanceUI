@@ -70,8 +70,9 @@ const handleFileChange = async (event: Event) => {
 
   try {
     const text = await file.text()
+    // Populate the textarea with the file contents but do NOT import yet.
+    // The user must click the Import CSV button to begin the import.
     csvContent.value = text
-    await importCsvContent(text)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to read the selected file'
     console.error('File import error:', e)
@@ -104,6 +105,7 @@ const handleFileChange = async (event: Event) => {
         <div v-if="lastFileName" class="file-status">
           Loaded: <strong>{{ lastFileName }}</strong>
           <span v-if="fileReading">(reading…)</span>
+          <div class="hint">Click "Import CSV" to begin importing the loaded file.</div>
         </div>
         <textarea
           v-model="csvContent"

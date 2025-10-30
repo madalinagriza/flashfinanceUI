@@ -140,6 +140,19 @@ const extractUserId = (value: unknown): string | null => normalizeId((value as a
 
 const userId = computed(() => extractUserId(props.user));
 
+// Check per-user preference (localStorage) for whether AI suggestions should be requested.
+const isSuggestEnabled = (uid: string | null): boolean => {
+  if (!uid) return false
+  try {
+    const raw = localStorage.getItem(`suggestAi_${uid}`)
+    // default true if not set
+    return raw == null ? true : raw === 'true'
+  } catch (e) {
+    console.error('Failed to read suggest-AI preference, defaulting to enabled', e)
+    return true
+  }
+}
+
 const resolveTxIdValue = (value: unknown): string | null => normalizeId(value);
 
 const extractTxId = (tx: unknown): string | null => {
@@ -503,7 +516,15 @@ onMounted(async () => {
   }
   activeTx.value = sessionTransactions.value[sessionIndex.value] ?? props.transaction ?? null
   // Ensure categories are loaded before requesting a suggestion (spec requires non-empty categories)
-  await fetchSuggestion();
+  if (isSuggestEnabled(userId.value)) {
+    await fetchSuggestion();
+  } else {
+    // Clear any previous suggestion state if suggestions are disabled
+    suggestedCategoryId.value = null
+    suggestError.value = null
+    suggestLoading.value = false
+    console.debug('AI suggestions are disabled for user', userId.value)
+  }
 });
 
 watch(
@@ -516,7 +537,15 @@ watch(
     suggestedCategoryId.value = null;
     suggestError.value = null;
     wasStagedHere.value = false;
-    fetchSuggestion();
+    // Only attempt suggestions if enabled for this user
+    if (isSuggestEnabled(userId.value)) {
+      fetchSuggestion();
+    } else {
+      suggestedCategoryId.value = null;
+      suggestError.value = null;
+      suggestLoading.value = false;
+      console.debug('Skipping suggestion because user preference disabled', userId.value);
+    }
   }
 );
 
