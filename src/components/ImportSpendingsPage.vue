@@ -39,10 +39,26 @@ const importCsvContent = async (content: string) => {
 
   loading.value = true
   try {
-    await transactionApi.importTransactions({
+    const result = await transactionApi.importTransactions({
       owner_id: currentUserId,
       fileContent: content,
     })
+    const imported = Array.isArray(result) ? result : []
+    transactions.value = imported
+
+    if (typeof window !== 'undefined' && currentUserId) {
+      const metaKey = `ff:last-import:${currentUserId}`
+      const payload = {
+        timestamp: new Date().toISOString(),
+        count: imported.length,
+      }
+      try {
+        window.localStorage.setItem(metaKey, JSON.stringify(payload))
+      } catch (storageErr) {
+        console.warn('Unable to persist last import metadata', storageErr)
+      }
+    }
+
     // On successful import, navigate to Unlabeled; that page refetches by user on mount.
     emit('navigate', 'unlabeled')
   } catch (e) {
@@ -103,11 +119,13 @@ const handleFileChange = async (event: Event) => {
           </div>
         </div>
         <div class="ff-header-actions">
-          <button type="button" class="header-link" @click="emit('navigate', 'unlabeled')">View unlabeled queue</button>
+          <button type="button" class="ff-pill-action accent import-cta" @click="emit('navigate', 'unlabeled')">
+            View unlabeled queue
+          </button>
         </div>
       </header>
 
-      <div class="ff-page-grid">
+      <div class="ff-page-grid import-grid">
         <div class="ff-column">
           <section class="ff-card import-card">
             <h2 class="ff-card-title">Upload or paste your CSV</h2>
@@ -149,7 +167,7 @@ const handleFileChange = async (event: Event) => {
           </section>
         </div>
 
-        <div class="ff-column">
+        <div class="ff-column import-aside">
           <section class="ff-card compact import-notes">
             <h3 class="notes-title">Import tips</h3>
             <ul class="notes-list">
@@ -207,8 +225,9 @@ const handleFileChange = async (event: Event) => {
 
 .header-stack {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .heading-copy h1 {
@@ -216,20 +235,17 @@ const handleFileChange = async (event: Event) => {
   color: var(--ff-primary);
 }
 
-.header-link {
-  background: none;
-  border: none;
-  color: var(--ff-secondary);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.2s ease;
+.import-cta {
+  font-size: 0.95rem;
 }
 
-.header-link:hover,
-.header-link:focus-visible {
-  color: var(--ff-secondary-hover);
-  outline: none;
+.ff-page-grid {
+  margin-top: 24px;
+}
+
+.import-grid {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 0.3fr);
+  align-items: start;
 }
 
 .import-card {
@@ -331,22 +347,36 @@ const handleFileChange = async (event: Event) => {
   outline: none;
 }
 
+.import-aside {
+  align-self: stretch;
+}
+
 .import-notes {
-  display: grid;
-  gap: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--ff-surface-subtle);
+  font-size: 0.9rem;
 }
 
 .notes-title {
   margin: 0;
-  color: var(--ff-primary);
-  font-size: 1.1rem;
+  color: var(--ff-text-strong);
+  font-size: 1rem;
 }
 
 .notes-list {
   margin: 0;
-  padding-left: 1.1rem;
+  padding-left: 18px;
   color: var(--ff-text-muted);
-  line-height: 1.6;
+  line-height: 1.4;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 8px;
+}
+
+.notes-list li::marker {
+  color: var(--ff-accent);
 }
 
 .status-card {
@@ -382,6 +412,7 @@ const handleFileChange = async (event: Event) => {
   overflow: auto;
   border-radius: 12px;
   border: 1px solid var(--ff-border);
+  max-height: 260px;
 }
 
 .tx-table {
@@ -428,14 +459,19 @@ const handleFileChange = async (event: Event) => {
   color: var(--ff-success);
 }
 
+@media (max-width: 900px) {
+  .import-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 720px) {
   .header-stack {
-    flex-direction: column;
     align-items: stretch;
   }
 
-  .header-link {
-    align-self: flex-start;
+  .ff-header-actions {
+    width: 100%;
   }
 
   .action-button {

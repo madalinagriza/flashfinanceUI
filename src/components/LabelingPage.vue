@@ -2,25 +2,45 @@
   <div class="labeling-page ff-page">
     <div v-if="currentTx" class="ff-page-frame">
       <header class="ff-page-header labeling-header">
-        <div class="header-main">
+        <div class="labeling-heading">
           <h1>Label Transaction</h1>
           <p class="ff-page-subtitle">Categorize the spending below.</p>
         </div>
-        <div v-if="sessionTransactions.length" class="ff-header-actions session-controls">
-          <span class="session-progress">Session {{ sessionIndex + 1 }} / {{ sessionTransactions.length }}</span>
+        <div class="labeling-actions">
+          <span v-if="sessionTransactions.length" class="session-indicator">
+            Tx {{ sessionIndex + 1 }} of {{ sessionTransactions.length }}
+          </span>
           <button
+            v-if="sessionTransactions.length > 1"
             type="button"
-            class="header-next"
+            class="action-button ghost header-next"
             @click="nextTx"
-            :disabled="stageLoading || finalizeLoading"
+            :disabled="stageLoading || finalizeLoading || sessionIndex >= sessionTransactions.length - 1"
           >
             Next
+          </button>
+          <button
+            type="button"
+            class="action-button primary header-finalize"
+            @click="finalizeLabeling"
+            :disabled="finalizeLoading || !userId || !currentTx"
+          >
+            <template v-if="finalizeLoading">Finalizing…</template>
+            <template v-else>
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              Finalize session
+            </template>
           </button>
         </div>
       </header>
 
-      <div class="ff-page-grid">
-        <div class="ff-column">
+      <div class="ff-page-grid labeling-layout">
+        <div class="ff-column labeling-column">
           <section class="ff-card tx-card">
             <h2 class="ff-card-title">Transaction details</h2>
             <div class="tx-grid">
@@ -35,10 +55,6 @@
               <div class="tx-row">
                 <span class="tx-label">Amount</span>
                 <span class="tx-value amount">{{ formatCurrency(currentTx!.amount) }}</span>
-              </div>
-              <div class="tx-row">
-                <span class="tx-label">Transaction ID</span>
-                <span class="tx-value mono">{{ currentTx!.tx_id }}</span>
               </div>
             </div>
           </section>
@@ -63,7 +79,6 @@
                 Send to trash
               </button>
             </div>
-
             <div v-if="loading" class="loading-message">Loading categories…</div>
             <div v-if="error" class="banner error">
               <span class="ff-icon" aria-hidden="true">
@@ -118,56 +133,27 @@
               </button>
             </div>
             <div v-else-if="!loading && !error && !suggestLoading" class="no-data">No categories found.</div>
-          </section>
-        </div>
-
-        <div class="ff-column">
-          <section v-if="sessionTransactions.length" class="ff-card compact session-card">
-            <h3 class="section-title">Session progress</h3>
-            <p class="ff-summary">Currently viewing transaction {{ sessionIndex + 1 }} of {{ sessionTransactions.length }}.</p>
-            <p class="ff-summary">Labeled this session: <strong>{{ sessionStagedTxIds.size }}</strong></p>
-          </section>
-
-          <section class="ff-card compact finalize-card">
-            <h3 class="section-title">Finalize session</h3>
-            <p class="ff-summary">Finalize once you have labeled every transaction in the queue.</p>
-            <button
-              class="action-button primary"
-              type="button"
-              @click="finalizeLabeling"
-              :disabled="finalizeLoading || !userId"
-            >
-              <template v-if="finalizeLoading">Finalizing…</template>
-              <template v-else>
+            <div v-if="finalizeError || finalizeMessage" class="finalize-status">
+              <div v-if="finalizeError" class="banner error">
                 <span class="ff-icon" aria-hidden="true">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                  </svg>
+                </span>
+                {{ finalizeError }}
+              </div>
+              <div v-if="finalizeMessage" class="banner success">
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 11l3.5 3.5L15 8" />
                     <circle cx="10" cy="10" r="8" />
                   </svg>
                 </span>
-                Finalize session
-              </template>
-            </button>
-            <div v-if="finalizeError" class="banner error">
-              <span class="ff-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="10" cy="10" r="8" />
-                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
-                </svg>
-              </span>
-              {{ finalizeError }}
-            </div>
-            <div v-if="finalizeMessage" class="banner success">
-              <span class="ff-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 11l3.5 3.5L15 8" />
-                  <circle cx="10" cy="10" r="8" />
-                </svg>
-              </span>
-              {{ finalizeMessage }}
+                {{ finalizeMessage }}
+              </div>
             </div>
           </section>
-
           <section class="ff-card compact tips-card">
             <h3 class="section-title">Labeling tips</h3>
             <ul class="tips-list">
@@ -667,25 +653,33 @@ const skipTx = () => {
 
 <style scoped>
 .labeling-header {
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
 }
 
-.header-main h1 {
+.labeling-heading {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.labeling-heading h1 {
   margin: 0;
   color: var(--ff-primary);
 }
 
-.session-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.session-progress {
+.labeling-actions {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.session-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
   background: var(--ff-primary-ghost);
@@ -696,28 +690,13 @@ const skipTx = () => {
   text-transform: uppercase;
 }
 
-.header-next {
-  border: none;
-  border-radius: 999px;
-  padding: 0.55rem 1.3rem;
-  background: var(--ff-secondary);
-  color: var(--ff-surface);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+.labeling-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.header-next:hover,
-.header-next:focus-visible {
-  background: var(--ff-secondary-hover);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.header-next:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.labeling-column {
+  display: grid;
+  gap: 1.5rem;
 }
 
 .tx-card {
@@ -762,14 +741,6 @@ const skipTx = () => {
 .tx-value.amount {
   color: var(--ff-secondary);
   font-size: 1.15rem;
-}
-
-.tx-value.mono {
-  font-family: monospace;
-  font-size: 0.9rem;
-  background: var(--ff-overlay);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
 }
 
 .category-card {
@@ -895,8 +866,6 @@ const skipTx = () => {
   font-size: 0.95rem;
 }
 
-.session-card,
-.finalize-card,
 .tips-card {
   display: grid;
   gap: 0.75rem;
@@ -933,6 +902,17 @@ const skipTx = () => {
   color: var(--ff-surface);
 }
 
+.action-button.ghost {
+  background: var(--ff-surface);
+  color: var(--ff-text-base);
+  border: 1px solid var(--ff-border);
+}
+
+.action-button.ghost:hover:not(:disabled),
+.action-button.ghost:focus-visible:not(:disabled) {
+  background: var(--ff-overlay);
+}
+
 .action-button.primary:hover:not(:disabled),
 .action-button.primary:focus-visible:not(:disabled) {
   background: var(--ff-primary-hover);
@@ -957,6 +937,12 @@ const skipTx = () => {
   transform: none;
 }
 
+.finalize-status {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 .empty-state {
   display: grid;
   gap: 1rem;
@@ -978,12 +964,20 @@ const skipTx = () => {
 }
 
 @media (max-width: 720px) {
-  .session-controls {
-    align-self: stretch;
+  .labeling-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
   }
 
-  .header-next {
+  .labeling-actions {
     width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .labeling-actions .action-button {
+    flex: 1 1 100%;
   }
 
   .category-header {

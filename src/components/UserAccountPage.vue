@@ -176,162 +176,169 @@ const handleChangePassword = async () => {
 </script>
 
 <template>
-  <div class="account-page" v-if="accountUser">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">
-        <span class="icon icon-arrow" aria-hidden="true">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12.5 4.5L7 10l5.5 5.5" />
-            <path d="M7 10h7" />
-          </svg>
-        </span>
-        <span>Back to Home</span>
-      </button>
-    </div>
-
-    <div class="container">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Account Settings</p>
-          <h1>{{ accountUser.name }}</h1>
-          <p class="description">Manage account status and credentials.</p>
+  <div class="account-page ff-page" v-if="accountUser">
+    <div class="ff-page-frame">
+      <header class="ff-page-header account-header">
+        <div class="header-leading">
+          <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
+            <span class="ff-icon icon-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.5 4.5L7 10l5.5 5.5" />
+              </svg>
+            </span>
+            Back to Dashboard
+          </button>
+          <div class="heading-copy">
+            <p class="eyebrow">Account Settings</p>
+            <h1>{{ accountUser.name }}</h1>
+            <p class="ff-page-subtitle">Manage account status and credentials.</p>
+          </div>
         </div>
-        <div class="status">
-          <span class="label">Status:</span>
-          <span class="status-badge" :class="statusBadgeClass">{{ accountUser.status }}</span>
+        <div class="ff-header-actions">
+          <span class="status-pill" :class="statusBadgeClass">{{ accountUser.status }}</span>
         </div>
       </header>
 
-      <section class="card">
-        <h2>Profile Info</h2>
-        <div class="profile-grid">
-          <div>
-            <span class="label">Email</span>
-            <p class="value">{{ accountUser.email }}</p>
+      <div class="ff-page-grid account-grid">
+        <section class="ff-card account-card">
+          <div class="account-section profile-section">
+            <h2 class="section-title">Profile Info</h2>
+            <div class="profile-grid">
+              <div>
+                <span class="field-label">Email</span>
+                <p class="field-value">{{ accountUser.email }}</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Deactivate Account</h2>
-          <p>Deactivate to revoke access while preserving data.</p>
-        </div>
-        <div v-if="deactivateState.error" class="alert error">
-          <span class="icon icon-error" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="10" cy="10" r="8" />
-              <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
-            </svg>
-          </span>
-          <span>{{ deactivateState.error }}</span>
-        </div>
-        <div v-if="deactivateState.message" class="alert success">
-          <span class="icon icon-check" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 11l3.5 3.5L15 8" />
-              <circle cx="10" cy="10" r="8" />
-            </svg>
-          </span>
-          <span>{{ deactivateState.message }}</span>
-        </div>
-        <button
-          class="btn-deactivate"
-          @click="handleDeactivate"
-          :disabled="!canDeactivate"
-        >
-          {{ deactivateState.loading ? 'Deactivating...' : 'Deactivate Account' }}
-        </button>
-      </section>
+          <div class="account-divider"></div>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Change Password</h2>
-          <p>Update the password using the current credential for verification.</p>
-        </div>
-        <div v-if="passwordState.error" class="alert error">
-          <span class="icon icon-error" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="10" cy="10" r="8" />
-              <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
-            </svg>
-          </span>
-          <span>{{ passwordState.error }}</span>
-        </div>
-        <div v-if="passwordState.message" class="alert success">
-          <span class="icon icon-check" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 11l3.5 3.5L15 8" />
-              <circle cx="10" cy="10" r="8" />
-            </svg>
-          </span>
-          <span>{{ passwordState.message }}</span>
-        </div>
-        <form class="password-form" @submit.prevent="handleChangePassword">
-          <label class="form-field">
-            <span>Current Password</span>
-            <input
-              type="password"
-              v-model="passwordForm.oldPassword"
-              autocomplete="current-password"
-              required
-            />
-          </label>
-          <label class="form-field">
-            <span>New Password</span>
-            <input
-              type="password"
-              v-model="passwordForm.newPassword"
-              autocomplete="new-password"
-              required
-            />
-          </label>
-          <label class="form-field">
-            <span>Confirm New Password</span>
-            <input
-              type="password"
-              v-model="passwordForm.confirmPassword"
-              autocomplete="new-password"
-              required
-            />
-          </label>
-          <button class="btn-primary" type="submit" :disabled="passwordState.loading">
-            {{ passwordState.loading ? 'Updating...' : 'Change Password' }}
-          </button>
-        </form>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <h2>Preferences</h2>
-          <p>Control labeling suggestions powered by AI.</p>
-        </div>
-        <div class="preference-row">
-          <label class="form-field" style="flex-direction:row;align-items:center;gap:0.75rem">
-            <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
-            <span>Suggest categories with AI</span>
-          </label>
-          <div
-            v-if="suggestPref.message"
-            class="alert"
-            :class="{ success: !suggestPref.message.includes('Unable'), error: suggestPref.message.includes('Unable') }"
-          >
-            <span v-if="suggestPref.message.includes('Unable')" class="icon icon-error" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="8" />
-                <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
-              </svg>
-            </span>
-            <span v-else class="icon icon-check" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 11l3.5 3.5L15 8" />
-                <circle cx="10" cy="10" r="8" />
-              </svg>
-            </span>
-            <span>{{ suggestPref.message }}</span>
+          <div class="account-section deactivate-section">
+            <div class="section-heading">
+              <h2 class="section-title">Deactivate Account</h2>
+              <p class="section-copy">Deactivate to revoke access while preserving data.</p>
+            </div>
+            <div v-if="deactivateState.error" class="alert error">
+              <span class="icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              <span>{{ deactivateState.error }}</span>
+            </div>
+            <div v-if="deactivateState.message" class="alert success">
+              <span class="icon icon-check" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              <span>{{ deactivateState.message }}</span>
+            </div>
+            <button
+              class="btn-deactivate"
+              @click="handleDeactivate"
+              :disabled="!canDeactivate"
+            >
+              {{ deactivateState.loading ? 'Deactivating...' : 'Deactivate Account' }}
+            </button>
           </div>
-        </div>
-      </section>
+
+          <div class="account-divider"></div>
+
+          <div class="account-section password-section">
+            <div class="section-heading">
+              <h2 class="section-title">Change Password</h2>
+              <p class="section-copy">Update the password using the current credential for verification.</p>
+            </div>
+            <div v-if="passwordState.error" class="alert error">
+              <span class="icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              <span>{{ passwordState.error }}</span>
+            </div>
+            <div v-if="passwordState.message" class="alert success">
+              <span class="icon icon-check" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              <span>{{ passwordState.message }}</span>
+            </div>
+            <form class="password-form" @submit.prevent="handleChangePassword">
+              <label class="form-field">
+                <span>Current Password</span>
+                <input
+                  type="password"
+                  v-model="passwordForm.oldPassword"
+                  autocomplete="current-password"
+                  required
+                />
+              </label>
+              <label class="form-field">
+                <span>New Password</span>
+                <input
+                  type="password"
+                  v-model="passwordForm.newPassword"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <label class="form-field">
+                <span>Confirm New Password</span>
+                <input
+                  type="password"
+                  v-model="passwordForm.confirmPassword"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <div class="form-actions">
+                <button class="btn-primary" type="submit" :disabled="passwordState.loading">
+                  {{ passwordState.loading ? 'Updating...' : 'Change Password' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="account-divider"></div>
+
+          <div class="account-section preference-section">
+            <div class="section-heading">
+              <h2 class="section-title">Preferences</h2>
+              <p class="section-copy">Control labeling suggestions powered by AI.</p>
+            </div>
+            <label class="toggle-field">
+              <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
+              <span>Suggest categories with AI</span>
+            </label>
+            <div
+              v-if="suggestPref.message"
+              class="alert"
+              :class="{ success: !suggestPref.message.includes('Unable'), error: suggestPref.message.includes('Unable') }"
+            >
+              <span v-if="suggestPref.message.includes('Unable')" class="icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              <span v-else class="icon icon-check" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              <span>{{ suggestPref.message }}</span>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
   <div v-else class="missing-user">
@@ -341,142 +348,125 @@ const handleChangePassword = async () => {
 </template>
 
 <style scoped>
-.account-page {
-  min-height: 100vh;
-  background: var(--ff-background);
-  padding: 2rem 1rem 3rem 1rem;
-}
-
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-}
-
-.btn-back {
-  background: var(--ff-surface);
-  color: var(--ff-primary);
-  border: 1px solid var(--ff-primary-border-strong);
-  border-radius: 6px;
-  padding: 0.5rem 0.85rem;
-  cursor: pointer;
-  transition: background 0.2s ease;
-  display: inline-flex;
+.account-header {
   align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-back:hover {
-  background: var(--ff-primary-ghost);
-}
-
-.container {
-  max-width: 960px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
 }
 
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.75rem;
-  color: rgba(31, 41, 51, 0.56);
-  margin-bottom: 0.25rem;
+  color: var(--ff-text-subtle);
 }
 
-.description {
-  color: rgba(31, 41, 51, 0.72);
-  margin-top: 0.5rem;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.status-badge {
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-badge.active {
-  background: var(--ff-success-soft);
-  color: var(--ff-success);
-}
-
-.status-badge.inactive {
-  background: var(--ff-error-soft);
-  color: var(--ff-error);
-}
-
-.card {
-  background: var(--ff-surface);
-  border-radius: 12px;
-  padding: 1.75rem;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+.header-leading {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  align-items: flex-start;
+  gap: 0.75rem;
 }
 
-.card-header h2 {
+.account-header .heading-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.account-header .heading-copy h1 {
   margin: 0;
   color: var(--ff-primary);
 }
 
-.card-header p {
-  margin: 0.5rem 0 0 0;
-  color: rgba(31, 41, 51, 0.72);
+.account-grid {
+  grid-template-columns: minmax(0, 0.78fr);
+  justify-content: center;
+}
+
+.account-card {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 720px;
+  display: grid;
+  gap: 2rem;
+}
+
+.account-section {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.section-heading {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--ff-text-muted);
+}
+
+.section-title {
+  margin: 0;
+  color: var(--ff-primary);
+}
+
+.section-copy {
+  margin: 0;
+  color: var(--ff-text-muted);
+}
+
+.account-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--ff-border);
 }
 
 .profile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
-.label {
+.field-label {
   display: block;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(31, 41, 51, 0.56);
-  margin-bottom: 0.4rem;
+  color: var(--ff-text-subtle);
 }
 
-.value {
-  font-size: 1rem;
-  color: rgba(31, 41, 51, 0.88);
+.field-value {
+  margin: 0.35rem 0 0 0;
+  color: var(--ff-text-base);
+  font-weight: 600;
   word-break: break-all;
 }
 
-.alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
 }
 
-.alert span:last-child {
-  flex: 1;
-  line-height: 1.4;
+.status-pill.active {
+  background: var(--ff-success-soft);
+  color: var(--ff-success);
+}
+
+.status-pill.inactive {
+  background: var(--ff-error-soft);
+  color: var(--ff-error);
+}
+
+.alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
 }
 
 .alert.error {
@@ -491,16 +481,26 @@ const handleChangePassword = async () => {
   color: var(--ff-success);
 }
 
+.alert span:last-child {
+  flex: 1;
+  line-height: 1.4;
+}
+
 .btn-deactivate {
-  align-self: flex-start;
-  padding: 0.6rem 1.2rem;
+  justify-self: flex-start;
+  padding: 0.6rem 1.3rem;
   border: none;
   border-radius: 6px;
-  background: var(--ff-error-soft);
-  color: var(--ff-error);
+  background: var(--ff-error);
+  color: var(--ff-surface);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.btn-deactivate:hover:not(:disabled) {
+  background: #b94945;
+  transform: translateY(-1px);
 }
 
 .btn-deactivate:disabled {
@@ -509,42 +509,43 @@ const handleChangePassword = async () => {
   transform: none;
 }
 
-.btn-deactivate:hover:not(:disabled) {
-  background: rgba(196, 76, 76, 0.26);
-  transform: translateY(-1px);
-}
-
 .password-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  display: grid;
+  gap: 1.1rem;
 }
 
 .form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  color: rgba(31, 41, 51, 0.78);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.form-field span {
+  color: var(--ff-text-base);
+  font-weight: 600;
 }
 
 .form-field input {
-  padding: 0.6rem;
-  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
   border: 1px solid var(--ff-primary-border-strong);
-  font-size: 1rem;
-  background: var(--ff-surface);
+  background: var(--ff-background);
+  color: var(--ff-text-base);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .btn-primary {
-  align-self: flex-start;
-  padding: 0.65rem 1.5rem;
+  padding: 0.65rem 1.4rem;
   border: none;
   border-radius: 6px;
   background: var(--ff-primary);
   color: var(--ff-surface);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -555,34 +556,43 @@ const handleChangePassword = async () => {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+}
+
+.toggle-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  color: var(--ff-text-base);
+}
+
+.toggle-field input {
+  width: 1rem;
+  height: 1rem;
 }
 
 .missing-user {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: grid;
   gap: 1rem;
+  place-content: center;
+  text-align: center;
   background: var(--ff-background);
-  color: rgba(31, 41, 51, 0.78);
+  color: var(--ff-text-base);
 }
 
 .icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .icon svg {
   width: 100%;
   height: 100%;
-}
-
-.icon-arrow {
-  color: var(--ff-primary);
 }
 
 .icon-error {
@@ -591,5 +601,28 @@ const handleChangePassword = async () => {
 
 .icon-check {
   color: var(--ff-success);
+}
+
+@media (max-width: 900px) {
+  .account-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .header-leading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-card {
+    gap: 1.5rem;
+  }
+
+  .btn-deactivate,
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

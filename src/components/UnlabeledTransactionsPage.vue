@@ -104,115 +104,102 @@ onMounted(fetchUnlabeledTransactions)
             <p class="ff-page-subtitle">Review new activity and launch a labeling session to keep categories fresh.</p>
           </div>
         </div>
-        <div class="ff-header-actions">
-          <button type="button" class="header-refresh" @click="fetchUnlabeledTransactions" :disabled="loading">
-            <span class="ff-icon icon-refresh" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 10a7 7 0 0 0-7-7 7 7 0 0 0-6.6 4.8" />
-                <path d="M6 4h-3V1" />
-                <path d="M3 10a7 7 0 0 0 7 7 7 7 0 0 0 6.6-4.8" />
-                <path d="M14 16h3v3" />
-              </svg>
-            </span>
-            <span>{{ loading ? 'Refreshing…' : 'Refresh' }}</span>
-          </button>
-        </div>
       </header>
 
-      <div class="ff-page-grid">
-        <div class="ff-column">
-          <section class="ff-card queue-card">
-            <div class="queue-top">
-              <div class="queue-summary">
-                <h2 class="ff-card-title">Queue overview</h2>
-                <p class="ff-card-subtitle">{{ displayedTransactions.length }} transaction<span v-if="displayedTransactions.length !== 1">s</span> awaiting labels.</p>
-              </div>
-              <button
-                v-if="displayedTransactions.length > 0"
-                type="button"
-                class="action-button secondary"
-                @click="emit('start-labeling', displayedTransactions[0])"
-              >
-                Start labeling session
-              </button>
-            </div>
-
-            <div v-if="error" class="banner error">
-              <span class="ff-icon icon-error" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="10" cy="10" r="8" />
-                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
-                </svg>
-              </span>
-              {{ error }}
-            </div>
-            <div v-else-if="loading" class="loading-message">Loading transactions…</div>
-            <div
-              v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
-              class="banner warning"
-            >
-              <span class="ff-icon icon-warning" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M10 3.2l7.2 12.6a1 1 0 0 1-.87 1.5H3.67a1 1 0 0 1-.87-1.5L10 3.2z" />
-                  <path d="M10 8v3.8" />
-                  <path d="M10 14.8h.01" />
-                </svg>
-              </span>
-              We fetched {{ transactions.length }} item(s), but none belong to the current user. This usually means the backend returned transactions with a different owner ID.
-            </div>
-            <div v-else-if="displayedTransactions.length === 0" class="empty-message">
-              <span class="ff-icon icon-check" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 11l3.5 3.5L15 8" />
-                  <circle cx="10" cy="10" r="8" />
-                </svg>
-              </span>
-              All transactions are labeled!
-            </div>
-            <div v-else class="table-wrapper">
-              <table class="tx-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Merchant</th>
-                    <th class="right">Amount</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
-                    <td>{{ tx.date }}</td>
-                    <td>{{ tx.merchant_text }}</td>
-                    <td class="right">{{ formatCurrency(tx.amount) }}</td>
-                    <td>
-                      <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
-                    </td>
-                    <td>
-                      <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        <div class="ff-column">
-          <section class="ff-card compact summary-card">
-            <h3 class="summary-title">Queue tips</h3>
-            <ul class="notes-list">
-              <li>Start a session to label items sequentially.</li>
-              <li>Use category shortcuts inside the labeling screen to move faster.</li>
+      <div class="ff-page-grid queue-layout">
+        <div class="queue-support">
+          <section class="ff-card compact tips-card">
+            <h3 class="support-title">Queue tips</h3>
+            <ul class="tips-list">
+              <li>Label a handful of transactions at a time to keep momentum.</li>
+              <li>Use shortcuts inside the labeling screen to move faster.</li>
               <li>Refresh the queue after importing new transactions.</li>
             </ul>
           </section>
-          <section class="ff-card compact summary-card" v-if="displayedTransactions.length">
-            <h3 class="summary-title">At a glance</h3>
-            <p class="ff-summary">{{ displayedTransactions.length }} pending label<span v-if="displayedTransactions.length !== 1">s</span>.</p>
-            <p class="ff-summary">Oldest transaction: {{ displayedTransactions[displayedTransactions.length - 1]?.date ?? '—' }}</p>
+          <section class="ff-card compact glance-card" v-if="displayedTransactions.length">
+            <h3 class="support-title">At a glance</h3>
+            <p class="support-copy">
+              {{ displayedTransactions.length }} pending label<span v-if="displayedTransactions.length !== 1">s</span>.
+            </p>
+            <p class="support-copy">Oldest transaction: {{ displayedTransactions[displayedTransactions.length - 1]?.date ?? '—' }}</p>
           </section>
         </div>
+
+        <section class="ff-card queue-card">
+          <div class="queue-top">
+            <div class="queue-summary">
+              <h2 class="ff-card-title">Queue overview</h2>
+              <p class="ff-card-subtitle">{{ displayedTransactions.length }} transaction<span v-if="displayedTransactions.length !== 1">s</span> awaiting labels.</p>
+            </div>
+            <button
+              v-if="displayedTransactions.length > 0"
+              type="button"
+              class="ff-pill-action accent queue-cta"
+              @click="emit('start-labeling', displayedTransactions[0])"
+            >
+              Start labeling session
+            </button>
+          </div>
+
+          <div v-if="error" class="banner error">
+            <span class="ff-icon icon-error" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+              </svg>
+            </span>
+            {{ error }}
+          </div>
+          <div v-else-if="loading" class="loading-message">Loading transactions…</div>
+          <div
+            v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
+            class="banner warning"
+          >
+            <span class="ff-icon icon-warning" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 3.2l7.2 12.6a1 1 0 0 1-.87 1.5H3.67a1 1 0 0 1-.87-1.5L10 3.2z" />
+                <path d="M10 8v3.8" />
+                <path d="M10 14.8h.01" />
+              </svg>
+            </span>
+            We fetched {{ transactions.length }} item(s), but none belong to the current user. This usually means the backend returned transactions with a different owner ID.
+          </div>
+          <div v-else-if="displayedTransactions.length === 0" class="empty-message">
+            <span class="ff-icon icon-check" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 11l3.5 3.5L15 8" />
+                <circle cx="10" cy="10" r="8" />
+              </svg>
+            </span>
+            All transactions are labeled!
+          </div>
+          <div v-else class="table-wrapper">
+            <table class="tx-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th class="right">Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
+                  <td>{{ tx.date }}</td>
+                  <td>{{ tx.merchant_text }}</td>
+                  <td class="right">{{ formatCurrency(tx.amount) }}</td>
+                  <td>
+                    <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
+                  </td>
+                  <td>
+                    <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -225,8 +212,9 @@ onMounted(fetchUnlabeledTransactions)
 
 .header-stack {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .heading-copy h1 {
@@ -234,30 +222,42 @@ onMounted(fetchUnlabeledTransactions)
   color: var(--ff-primary);
 }
 
-.header-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.95rem;
-  border-radius: 999px;
-  border: none;
-  background: var(--ff-secondary);
-  color: var(--ff-surface);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+.queue-layout {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 2rem;
 }
 
-.header-refresh:hover,
-.header-refresh:focus-visible {
-  background: var(--ff-secondary-hover);
-  transform: translateY(-1px);
-  outline: none;
+.queue-support {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
 }
 
-.header-refresh:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+.tips-card,
+.glance-card {
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.support-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1rem;
+}
+
+.support-copy {
+  margin: 0;
+  color: var(--ff-text-muted);
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  list-style: disc;
+  color: var(--ff-text-muted);
+  line-height: 1.45;
 }
 
 .queue-card {
@@ -279,25 +279,8 @@ onMounted(fetchUnlabeledTransactions)
   gap: 0.35rem;
 }
 
-.action-button {
-  border-radius: 999px;
-  border: none;
-  padding: 0.75rem 1.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.action-button.secondary {
-  background: var(--ff-secondary);
-  color: var(--ff-surface);
-}
-
-.action-button.secondary:hover,
-.action-button.secondary:focus-visible {
-  background: var(--ff-secondary-hover);
-  transform: translateY(-1px);
-  outline: none;
+.queue-cta {
+  white-space: nowrap;
 }
 
 .banner {
@@ -402,32 +385,15 @@ onMounted(fetchUnlabeledTransactions)
   outline: none;
 }
 
-.summary-card {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.summary-title {
-  margin: 0;
-  color: var(--ff-primary);
-  font-size: 1.1rem;
-}
-
-.notes-list {
-  margin: 0;
-  padding-left: 1.1rem;
-  color: var(--ff-text-muted);
-  line-height: 1.6;
-}
-
 @media (max-width: 720px) {
   .queue-top {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .action-button.secondary {
+  .queue-cta {
     width: 100%;
+    justify-content: center;
   }
 }
 </style>

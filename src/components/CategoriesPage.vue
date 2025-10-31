@@ -157,7 +157,7 @@ onMounted(() => {
   <div class="categories-page ff-page">
     <div class="ff-page-frame">
       <header class="ff-page-header categories-header">
-        <div class="header-stack">
+        <div class="header-leading">
           <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
             <span class="ff-icon icon-arrow" aria-hidden="true">
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -171,23 +171,10 @@ onMounted(() => {
             <p class="ff-page-subtitle">Create, rename, and review your category list to keep labeling fast and accurate.</p>
           </div>
         </div>
-        <div class="ff-header-actions">
-          <button type="button" class="header-refresh" @click="fetchCategories" :disabled="loading">
-            <span class="ff-icon icon-refresh" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 10a7 7 0 0 0-7-7 7 7 0 0 0-6.6 4.8" />
-                <path d="M6 4h-3V1" />
-                <path d="M3 10a7 7 0 0 0 7 7 7 7 0 0 0 6.6-4.8" />
-                <path d="M14 16h3v3" />
-              </svg>
-            </span>
-            <span>{{ loading ? 'Refreshing…' : 'Refresh' }}</span>
-          </button>
-        </div>
       </header>
 
-      <div class="ff-page-grid">
-        <div class="ff-column">
+      <div class="ff-page-grid categories-grid">
+        <div class="ff-column ff-full-width categories-column">
           <section class="ff-card add-card">
             <h2 class="ff-card-title">Create a category</h2>
             <p class="ff-card-subtitle">Add new categories to streamline future labeling.</p>
@@ -251,22 +238,6 @@ onMounted(() => {
             </ul>
           </section>
         </div>
-
-        <div class="ff-column">
-          <section class="ff-card compact summary-card">
-            <h3 class="summary-title">Quick summary</h3>
-            <ul class="notes-list">
-              <li>Total categories: <strong>{{ allCategories.length }}</strong></li>
-              <li v-if="adding">Adding a new category…</li>
-              <li v-else>Keep names short and specific for faster search during labeling.</li>
-            </ul>
-          </section>
-          <section class="ff-card compact summary-card">
-            <h3 class="summary-title">Next steps</h3>
-            <p class="ff-summary">Continue to the unlabeled queue once your categories match the accounts you track most often.</p>
-            <button type="button" class="inline-link" @click="emit('navigate', 'unlabeled')">Review unlabeled transactions</button>
-          </section>
-        </div>
       </div>
     </div>
   </div>
@@ -274,13 +245,14 @@ onMounted(() => {
 
 <style scoped>
 .categories-header {
-  align-items: flex-start;
+  align-items: center;
 }
 
-.header-stack {
+.header-leading {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .heading-copy h1 {
@@ -288,30 +260,14 @@ onMounted(() => {
   color: var(--ff-primary);
 }
 
-.header-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.95rem;
-  border-radius: 999px;
-  border: none;
-  background: var(--ff-secondary);
-  color: var(--ff-surface);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+.categories-grid {
+  margin-top: 0.5rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.header-refresh:hover,
-.header-refresh:focus-visible {
-  background: var(--ff-secondary-hover);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.header-refresh:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+.categories-column {
+  align-content: start;
+  gap: 2rem;
 }
 
 .add-card {
@@ -320,42 +276,6 @@ onMounted(() => {
 }
 
 .add-row {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.add-row input {
-  flex: 1;
-  padding: 0.7rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid var(--ff-primary-border-strong);
-  background: var(--ff-background);
-  color: var(--ff-text-base);
-}
-
-.action-button {
-  border-radius: 999px;
-  border: none;
-  padding: 0.75rem 1.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.action-button.primary {
-  background: var(--ff-primary);
-  color: var(--ff-surface);
-}
-
-.action-button.primary:hover,
-.action-button.primary:focus-visible {
-  background: var(--ff-primary-hover);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.banner {
-  display: flex;
   align-items: center;
   gap: 0.6rem;
   border-radius: 10px;
