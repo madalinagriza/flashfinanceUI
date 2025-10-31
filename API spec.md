@@ -19,7 +19,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
+  "owner_id": "string",
   "name": "string"
 }
 ```
@@ -51,8 +51,8 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID",
+  "owner_id": "string",
+  "category_id": "string",
   "new_name": "string"
 }
 ```
@@ -84,8 +84,8 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID",
+  "owner_id": "string",
+  "category_id": "string",
   "can_delete": "boolean"
 }
 ```
@@ -117,9 +117,9 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID",
-  "tx_id": "ID",
+  "owner_id": "string",
+  "category_id": "string",
+  "tx_id": "string",
   "amount": "Number",
   "tx_date": "Date"
 }
@@ -152,9 +152,9 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID",
-  "tx_id": "ID"
+  "owner_id": "string",
+  "category_id": "string",
+  "tx_id": "string"
 }
 ```
 
@@ -185,18 +185,18 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID"
+  "owner_id": "string",
+  "category_id": "string"
 }
 ```
 
 **Success Response Body (Query):**
 ```json
-[
-  {
-    "name": "string"
-  }
-]
+
+{
+  "name": "string"
+}
+
 ```
 
 **Error Response Body:**
@@ -219,7 +219,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID"
+  "owner_id": "string"
 }
 ```
 
@@ -239,7 +239,7 @@
 }
 ```
 ---
-### POST /api/Category/_listTransactions
+### POST /api/Category/listTransactions
 
 **Description:** Retrieves all transaction entries recorded for a specific user and category.
 
@@ -252,8 +252,8 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID"
+  "owner_id": "string",
+  "category_id": "string"
 }
 ```
 
@@ -275,7 +275,39 @@
 }
 ```
 ---
+### POST /api/Category/moveTransactionToTrash
 
+**Description:** Moves a recorded transaction from one category into the built-in Trash bucket.
+
+**Requirements:**
+- owner and source category exist; transaction with tx_id is recorded for the source category
+
+**Effects:**
+- removes the transaction record from the source category, ensures the owner's Trash category exists, and records the transaction (same amount/date) under Trash; returns true
+
+**Request Body:**
+```json
+{
+  "owner_id": "string",
+  "from_category_id": "string",
+  "tx_id": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "ok": "boolean"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
 ### POST /api/Category/getMetricStats
 
 **Description:** Computes and returns spending statistics for a category over a given period.
@@ -290,11 +322,11 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "category_id": "ID",
+  "owner_id": "string",
+  "category_id": "string",
   "period": {
-    "startDate": "Date",
-    "endDate": "Date"
+    "startDate": "string",
+    "endDate": "string"
   }
 }
 ```
@@ -329,7 +361,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID"
+  "owner_id": "string"
 }
 ```
 
@@ -372,11 +404,11 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "tx_id": "ID",
+  "user_id": "string",
+  "tx_id": "string",
   "tx_name": "string",
   "tx_merchant": "string",
-  "category_id": "ID"
+  "category_id": "string"
 }
 ```
 
@@ -407,8 +439,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "tx_id": "ID",
+  "user_id": "string",
+  "tx_id": "string",
   "tx_name": "string",
   "tx_merchant": "string"
 }
@@ -445,7 +477,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -475,7 +507,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -508,9 +540,9 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "tx_id": "ID",
-  "new_category_id": "ID"
+  "user_id": "string",
+  "tx_id": "string",
+  "new_category_id": "string"
 }
 ```
 
@@ -542,8 +574,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "tx_id": "ID"
+  "user_id": "string",
+  "tx_id": "string"
 }
 ```
 
@@ -575,14 +607,14 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
+  "user_id": "string",
   "allCategories": [
     ["categoryName", "categoryId"],
     ["categoryName", "categoryId"]
     ...
   ],
   "txInfo": {
-    "tx_id": "ID",
+    "tx_id": "string",
     "tx_name": "string",
     "tx_merchant": "string"
   }
@@ -617,8 +649,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "tx_id": "ID"
+  "user_id": "string",
+  "tx_id": "string"
 }
 ```
 
@@ -655,8 +687,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "category_id": "ID"
+  "user_id": "string",
+  "category_id": "string"
 }
 ```
 
@@ -689,8 +721,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "category_id": "ID"
+  "user_id": "string",
+  "category_id": "string"
 }
 ```
 
@@ -723,7 +755,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -756,7 +788,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -795,7 +827,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -832,8 +864,8 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
-  "category_id": "ID"
+  "user_id": "string",
+  "category_id": "string"
 }
 ```
 
@@ -872,7 +904,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
+  "owner_id": "string",
   "fileContent": "string"
 }
 ```
@@ -902,8 +934,8 @@
 **Request Body:**
 ```json
 {
-  "tx_id": "ID",
-  "requester_id": "ID"
+  "tx_id": "string",
+  "requester_id": "string"
 }
 ```
 
@@ -934,8 +966,8 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "tx_id": "ID"
+  "owner_id": "string",
+  "tx_id": "string"
 }
 ```
 
@@ -974,7 +1006,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID"
+  "owner_id": "string"
 }
 ```
 
@@ -1013,7 +1045,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID"
+  "owner_id": "string"
 }
 ```
 
@@ -1052,8 +1084,8 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID",
-  "tx_id": "ID"
+  "owner_id": "string",
+  "tx_id": "string"
 }
 ```
 
@@ -1088,7 +1120,7 @@
 **Request Body:**
 ```json
 {
-  "owner_id": "ID"
+  "owner_id": "string"
 }
 ```
 
@@ -1210,7 +1242,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID"
+  "user_id": "string"
 }
 ```
 
@@ -1239,7 +1271,7 @@
 **Request Body:**
 ```json
 {
-  "user_id": "ID",
+  "user_id": "string",
   "old_password": "string",
   "new_password": "string"
 }

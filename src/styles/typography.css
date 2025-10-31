@@ -1,0 +1,63 @@
+/* Typography system for FlashFinance */
+/* Utilities and global mappings for headings, body, monospace and logo */
+
+/* Base body font */
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  color: #111827;
+}
+
+/* Utility classes */
+.tt-title {
+  font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+}
+
+.tt-body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+}
+
+.tt-mono {
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  font-variant-numeric: lining-nums tabular-nums;
+  -moz-font-feature-settings: "tnum" 1;
+  -webkit-font-feature-settings: "tnum" 1;
+  font-feature-settings: "tnum" 1;
+}
+
+.tt-logo {
+  font-family: 'Nunito', 'Inter', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+/* Map headings and text utility classes used by Vuetify and components */
+/* Mobile-first sizes */
+h1 { font-size: 28px; line-height: 36px; }
+h2 { font-size: 22px; line-height: 30px; }
+h3 { font-size: 18px; line-height: 26px; }
+h4 { font-size: 16px; line-height: 24px; }
+h5 { font-size: 14px; line-height: 20px; }
+h6 { font-size: 13px; line-height: 18px; }
+
+.subtitle, .subtitle-1, .subtitle-2 { font-size: 14px; line-height: 20px; color: #6b7280; }
+.body-1, .body-2, p { font-size: 16px; line-height: 24px; }
+
+/* Desktop / larger screens adjustments */
+@media (min-width: 768px) {
+  h1 { font-size: 32px; line-height: 40px; }
+  h2 { font-size: 24px; line-height: 32px; }
+  h3 { font-size: 20px; line-height: 28px; }
+  h4 { font-size: 18px; line-height: 26px; }
+  h5 { font-size: 16px; line-height: 22px; }
+  h6 { font-size: 14px; line-height: 20px; }
+
+  .subtitle, .subtitle-1, .subtitle-2 { font-size: 16px; line-height: 24px; }
+  .body-1, .body-2, p { font-size: 16px; line-height: 24px; }
+}
+
+/* Small helpers */
+.mono { font-family: 'Roboto Mono', monospace; }

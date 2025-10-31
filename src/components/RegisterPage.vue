@@ -16,6 +16,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref(false)
 const registeredUser = ref<User | null>(null)
+const lastRegisteredUserId = ref<string | null>(null)
 
 const resetForm = () => {
   email.value = ''
@@ -54,7 +55,8 @@ const handleRegister = async () => {
       password: password.value,
     })
 
-    registeredUser.value = user
+  registeredUser.value = user
+  lastRegisteredUserId.value = user?.user_id ?? null
     success.value = true
     resetForm()
     
@@ -73,9 +75,7 @@ const handleRegister = async () => {
 
 <template>
   <div class="register-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
+    <!-- Topbar removed: do not expose navigation on register page -->
     <div class="register-card">
       <h2>Create Account</h2>
       <p class="subtitle">Sign up for FlashFinance</p>
@@ -129,14 +129,27 @@ const handleRegister = async () => {
           />
         </div>
 
-        <div v-if="error" class="error-message">
-          ❌ {{ error }}
+        <div v-if="error" class="alert error">
+          <span class="icon icon-error" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10" cy="10" r="8" />
+              <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+            </svg>
+          </span>
+          <span>{{ error }}</span>
         </div>
 
-        <div v-if="success" class="success-message">
-          ✅ Registration successful! Welcome, {{ registeredUser?.name }}!
-          <br />
-          <small>User ID: {{ registeredUser?.user_id }}</small>
+        <div v-if="success" class="alert success">
+          <span class="icon icon-check" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 11l3.5 3.5L15 8" />
+              <circle cx="10" cy="10" r="8" />
+            </svg>
+          </span>
+          <span>
+            Registration successful! Welcome, {{ registeredUser?.name }}!
+            <small v-if="lastRegisteredUserId" class="sr-only">New user id: {{ lastRegisteredUserId }}</small>
+          </span>
         </div>
 
         <button type="submit" class="btn-primary" :disabled="loading">
@@ -145,7 +158,7 @@ const handleRegister = async () => {
       </form>
 
       <div class="footer-text">
-        Already have an account? <a href="#">Sign in</a>
+        Already have an account? <a href="#" @click.prevent="emit('navigate', 'signin')">Sign in</a>
       </div>
     </div>
   </div>
@@ -157,29 +170,16 @@ const handleRegister = async () => {
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 70px);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--ff-background);
   padding: 2rem 1rem;
 }
 
-.topbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-}
-
-.btn-back {
-  background: rgba(255,255,255,0.9);
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
+/* Topbar and back button removed per design: register header shows only the logo in AppShell */
 
 .register-card {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  background: var(--ff-surface);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(17, 24, 39, 0.12);
   padding: 2rem;
   width: 100%;
   max-width: 420px;
@@ -187,13 +187,13 @@ const handleRegister = async () => {
 
 h2 {
   margin: 0 0 0.5rem 0;
-  color: #333;
+  color: var(--ff-text-strong);
   font-size: 1.75rem;
 }
 
 .subtitle {
   margin: 0 0 2rem 0;
-  color: #666;
+  color: var(--ff-text-muted);
   font-size: 0.95rem;
 }
 
@@ -211,42 +211,45 @@ form {
 
 label {
   font-weight: 600;
-  color: #333;
+  color: var(--ff-text-strong);
   font-size: 0.9rem;
 }
 
 input {
   padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--ff-primary-border-strong);
+  border-radius: 6px;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--ff-surface);
 }
 
 input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--ff-primary);
+  box-shadow: 0 0 0 3px var(--ff-primary-ghost);
 }
 
 input:disabled {
-  background: #f5f5f5;
+  background: rgba(61, 122, 116, 0.08);
   cursor: not-allowed;
 }
 
 .btn-primary {
   padding: 0.875rem;
-  background: #667eea;
-  color: white;
+  background: var(--ff-primary);
+  color: var(--ff-surface);
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #5568d3;
+  background: var(--ff-primary-hover);
+  transform: translateY(-1px);
 }
 
 .btn-primary:disabled {
@@ -254,42 +257,87 @@ input:disabled {
   cursor: not-allowed;
 }
 
-.error-message {
-  padding: 0.75rem;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  color: #c33;
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
   font-size: 0.9rem;
 }
 
-.success-message {
-  padding: 0.75rem;
-  background: #efe;
-  border: 1px solid #cfc;
-  border-radius: 4px;
-  color: #383;
-  font-size: 0.9rem;
+.alert span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: inherit;
+  line-height: 1.4;
 }
 
-.success-message small {
-  color: #666;
+.alert small {
+  color: var(--ff-text-muted);
+}
+
+.alert.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
+}
+
+.alert.success {
+  background: var(--ff-success-soft);
+  border: 1px solid var(--ff-success-border);
+  color: var(--ff-success);
 }
 
 .footer-text {
   margin-top: 1.5rem;
   text-align: center;
-  color: #666;
+  color: var(--ff-text-muted);
   font-size: 0.9rem;
 }
 
 .footer-text a {
-  color: #667eea;
+  color: var(--ff-primary);
   text-decoration: none;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .footer-text a:hover {
   text-decoration: underline;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-error {
+  color: var(--ff-error);
+}
+
+.icon-check {
+  color: var(--ff-success);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

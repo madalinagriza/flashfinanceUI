@@ -1,0 +1,45 @@
+:root {
+  /* Core palette */
+  --ff-primary: #3D7A74;        /* refreshed teal primary */
+  --ff-secondary: #E57B6F;      /* coral accent */
+  --ff-background: #FFFFFF;     /* clean page canvas */
+  --ff-surface: #F4F3EE;        /* soft off-white surface */
+  --ff-success: #4CA978;        /* fresh approval green */
+  --ff-error: #C44C4C;          /* confident error red */
+  --ff-warning: #E7B75B;        /* warm amber warning */
+
+  /* Derived palette */
+  --ff-secondary-soft: #EF9287; /* softened coral for fills */
+  --ff-secondary-hover: #D96D61;
+  --ff-primary-hover: #33635F;
+  --ff-primary-ghost: rgba(61, 122, 116, 0.12);
+  --ff-border: rgba(61, 122, 116, 0.14);
+  --ff-overlay: rgba(28, 28, 28, 0.08);
+  --ff-primary-border-strong: rgba(61, 122, 116, 0.28);
+  --ff-secondary-border: rgba(229, 123, 111, 0.32);
+  --ff-success-soft: rgba(76, 169, 120, 0.18);
+  --ff-success-border: rgba(76, 169, 120, 0.34);
+  --ff-error-soft: rgba(196, 76, 76, 0.18);
+  --ff-error-border: rgba(196, 76, 76, 0.34);
+
+  /* Typography tokens */
+  --ff-text-strong: #1C1C1C;
+  --ff-text-base: rgba(28, 28, 28, 0.92);
+  --ff-text-muted: #4A4A4A;
+  --ff-text-subtle: rgba(74, 74, 74, 0.55);
+
+  /* Aliases for backwards compatibility */
+  --ff-accent: var(--ff-secondary);
+  --ff-bg: var(--ff-background);
+
+  /* Layout tokens */
+  --radius: 14px;
+  --gap: 12px;
+}
+
+/* Utility helpers */
+.bg-ff { background-color: var(--ff-background); }
+.text-primary { color: var(--ff-primary); }
+.text-accent { color: var(--ff-secondary); }
+.text-strong { color: var(--ff-text-strong); }
+.text-muted { color: var(--ff-text-muted); }

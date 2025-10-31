@@ -7,6 +7,8 @@ import type {
   MarkLabeledRequest,
   GetTransactionRequest,
   GetUnlabeledTransactionsRequest,
+  GetTxInfoRequest,
+  TransactionInfoResponse,
   TxIdResponse,
 } from './types'
 
@@ -76,6 +78,21 @@ export const transactionApi = {
       const resp2 = await apiClient.post<GetUnlabeledTransactionsRequest, Transaction[]>(fallback, request)
       console.debug('transactionApi.getUnlabeledTransactions: used', fallback)
       return resp2
+    }
+  },
+
+  /**
+   * POST /api/Transaction/getTxInfo
+   * Retrieves the parsed info for a specific transaction.
+   */
+  async getTxInfo(request: GetTxInfoRequest): Promise<TransactionInfoResponse> {
+    const primary = '/Transaction/getTxInfo'
+    const fallback = '/Transaction/get_tx_info'
+    try {
+      return await apiClient.post<GetTxInfoRequest, TransactionInfoResponse>(primary, request)
+    } catch (err: any) {
+      console.warn(`getTxInfo primary endpoint ${primary} failed (${String(err?.message)}), retrying once`)
+      return await apiClient.post<GetTxInfoRequest, TransactionInfoResponse>(fallback, request)
     }
   },
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { transactionApi, type User, type Transaction } from '../api'
+import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
   user: User | null
@@ -18,34 +19,12 @@ const retriedOnce = ref(false)
 const showDebug = ref(false)
 
 // Safely extract a string user id from various shapes (matches Categories page logic)
-const extractUserId = (u: any): string | null => {
-  if (!u) return null
-  const candidate = u.user_id ?? u.id ?? u
-  if (candidate == null) return null
-  if (typeof candidate === 'string') return candidate
-  if (typeof candidate === 'object') {
-    if (typeof candidate.value === 'string') return candidate.value
-    if (typeof candidate.value === 'object' && typeof candidate.value.value === 'string') return candidate.value.value
-  }
-  try { return String(candidate) } catch { return null }
-}
+const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
 
 const userId = computed(() => extractUserId(props.user))
 
 // Normalize various server shapes for owner_id to a string
-const extractOwnerId = (value: unknown): string => {
-  if (value == null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'object') {
-    const o = value as any
-    const candidate = o.value ?? o.id ?? o.user_id ?? o.owner_id
-    if (typeof candidate === 'string') return candidate
-    if (candidate != null) {
-      try { return String(candidate) } catch { /* fallthrough */ }
-    }
-  }
-  try { return String(value) } catch { return '' }
-}
+const extractOwnerId = (value: unknown): string => normalizeId(value) ?? ''
 
 // Guard against server-side filtering mistakes: only show items owned by this user
 const displayedTransactions = computed(() => {
@@ -108,202 +87,258 @@ onMounted(fetchUnlabeledTransactions)
 </script>
 
 <template>
-  <div class="unlabeled-tx-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
-    <div class="container">
-      <div class="header">
-        <h1>Unlabeled Transactions</h1>
-        <button class="btn-refresh" @click="fetchUnlabeledTransactions" :disabled="loading">
-          {{ loading ? 'Refreshing…' : '🔄 Refresh' }}
-        </button>
-      </div>
-
-      <div v-if="error" class="error-message">❌ {{ error }}</div>
-      <div v-else-if="loading" class="loading-message">Loading transactions…</div>
-      <!-- If API returned items but none match current user, surface a helpful hint -->
-      <div
-        v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
-        class="error-message"
-      >
-        We fetched {{ transactions.length }} item(s), but none belong to the current user.
-        This usually means the backend returned transactions with a different owner_id.
-      </div>
-      <div v-else-if="displayedTransactions.length === 0" class="empty-message">
-        🎉 All transactions are labeled!
-      </div>
-      <div v-else class="results">
-        <p>You have {{ displayedTransactions.length }} transaction(s) to label.</p>
-        <button
-          class="btn-start-labeling"
-          @click="emit('start-labeling', displayedTransactions[0])"
-          v-if="displayedTransactions.length > 0"
-        >
-          Start Labeling Session
-        </button>
-        <div class="table-wrapper">
-          <table class="tx-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Merchant</th>
-                <th class="right">Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
-                <td>{{ tx.date }}</td>
-                <td>{{ tx.merchant_text }}</td>
-                <td class="right">{{ formatCurrency(tx.amount) }}</td>
-                <td>
-                  <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
-                </td>
-                <td>
-                  <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+  <div class="unlabeled-tx-page ff-page">
+    <div class="ff-page-frame">
+      <header class="ff-page-header queue-header">
+        <div class="header-stack">
+          <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
+            <span class="ff-icon icon-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.5 4.5L7 10l5.5 5.5" />
+              </svg>
+            </span>
+            Back to Dashboard
+          </button>
+          <div class="heading-copy">
+            <h1>Unlabeled Transactions</h1>
+          </div>
         </div>
-      </div>
-      <!-- Debug section: shows raw API payload with owner ids (always visible) -->
-      <div class="debug-panel">
-        <button class="btn-debug" type="button" @click="showDebug = !showDebug">
-          {{ showDebug ? 'Hide' : 'Show' }} Debug (Raw API Results)
-        </button>
-        <div v-if="showDebug" class="debug-content">
-          <p>Total returned by API (no client filtering): {{ transactions.length }}</p>
-          <div class="table-wrapper">
-            <table class="tx-table debug-table">
+      </header>
+
+      <div class="ff-page-grid queue-layout">
+        <div class="queue-support">
+          <section class="ff-card compact tips-card">
+            <h3 class="support-title">Queue tips</h3>
+            <ul class="tips-list">
+              <li>Label a handful of transactions at a time to keep momentum.</li>
+              <li>For faster labeling, turn off suggestion more in the account page.</li>
+            </ul>
+          </section>
+          <section class="ff-card compact glance-card" v-if="displayedTransactions.length">
+            <h3 class="support-title">At a glance</h3>
+            <p class="support-copy">
+              {{ displayedTransactions.length }} pending label<span v-if="displayedTransactions.length !== 1">s</span>.
+            </p>
+            <p class="support-copy">Oldest transaction: {{ displayedTransactions[displayedTransactions.length - 1]?.date ?? '—' }}</p>
+          </section>
+        </div>
+
+        <section class="ff-card queue-card">
+          <div class="queue-top">
+            <div class="queue-summary">
+              <h2 class="ff-card-title">Queue overview</h2>
+              <p class="ff-card-subtitle">{{ displayedTransactions.length }} transaction<span v-if="displayedTransactions.length !== 1">s</span> awaiting labels.</p>
+            </div>
+            <button
+              v-if="displayedTransactions.length > 0"
+              type="button"
+              class="ff-pill-action accent queue-cta"
+              @click="emit('start-labeling', displayedTransactions[0])"
+            >
+              Start labeling session
+            </button>
+          </div>
+
+          <div v-if="error" class="banner error">
+            <span class="ff-icon icon-error" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+              </svg>
+            </span>
+            {{ error }}
+          </div>
+          <div v-else-if="loading" class="loading-message">Loading transactions…</div>
+          <div
+            v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
+            class="banner warning"
+          >
+            <span class="ff-icon icon-warning" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 3.2l7.2 12.6a1 1 0 0 1-.87 1.5H3.67a1 1 0 0 1-.87-1.5L10 3.2z" />
+                <path d="M10 8v3.8" />
+                <path d="M10 14.8h.01" />
+              </svg>
+            </span>
+            We fetched {{ transactions.length }} item(s), but none belong to the current user. This usually means the backend returned transactions with a different owner ID.
+          </div>
+          <div v-else-if="displayedTransactions.length === 0" class="empty-message">
+            <span class="ff-icon icon-check" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 10l3.5 3.5L15 7" />
+                <circle cx="10" cy="10" r="8" />
+              </svg>
+            </span>
+            <p class="empty-message-text">All transactions are labeled!</p>
+          </div>
+          <div v-else class="table-wrapper">
+            <table class="tx-table">
               <thead>
                 <tr>
-                  <th>Tx ID</th>
-                  <th>Owner ID</th>
                   <th>Date</th>
                   <th>Merchant</th>
                   <th class="right">Amount</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="rtx in transactions" :key="rtx.tx_id">
-                  <td class="mono">{{ rtx.tx_id }}</td>
-                  <td class="mono">{{ rtx.owner_id }}</td>
-                  <td>{{ rtx.date }}</td>
-                  <td>{{ rtx.merchant_text }}</td>
-                  <td class="right">{{ formatCurrency(rtx.amount) }}</td>
+                <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
+                  <td>{{ tx.date }}</td>
+                  <td>{{ tx.merchant_text }}</td>
+                  <td class="right">{{ formatCurrency(tx.amount) }}</td>
                   <td>
-                    <span class="status" :class="rtx.status.toLowerCase()">{{ rtx.status }}</span>
+                    <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
+                  </td>
+                  <td>
+                    <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.unlabeled-tx-page {
-  min-height: calc(100vh - 70px);
-  background: #f5f7fa;
-  padding: 2rem 1rem;
+.queue-header {
+  align-items: flex-start;
 }
 
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-}
-
-.btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
-
-.container {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.header {
+.header-stack {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.heading-copy h1 {
+  margin: 0;
+  color: var(--ff-primary);
+}
+
+.queue-layout {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 2rem;
+}
+
+.queue-support {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.tips-card,
+.glance-card {
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.support-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1rem;
+}
+
+.support-copy {
+  margin: 0;
+  color: var(--ff-text-muted);
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  list-style: disc;
+  color: var(--ff-text-muted);
+  line-height: 1.45;
+}
+
+.queue-card {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.queue-top {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
 
-h1 {
-  font-size: 2rem;
-  color: #333;
-  margin: 0;
+.queue-summary {
+  max-width: 32rem;
+  display: grid;
+  gap: 0.35rem;
 }
 
-.btn-refresh {
-  padding: 0.5rem 0.9rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.queue-cta {
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  box-shadow: 0 2px 6px rgba(31, 45, 54, 0.16);
 }
 
-.error-message,
-.loading-message,
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border-radius: 10px;
+  padding: 0.75rem 0.95rem;
+  font-size: 0.95rem;
+}
+
+.banner.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
+}
+
+.banner.warning {
+  background: var(--ff-warning, rgba(231, 183, 91, 0.18));
+  border: 1px solid rgba(231, 183, 91, 0.32);
+  color: #8a6728;
+}
+
+.loading-message {
+  color: var(--ff-text-muted);
+  font-size: 0.95rem;
+}
+
 .empty-message {
-  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 3rem 1.5rem;
+  border-radius: 16px;
+  background: linear-gradient(145deg, var(--ff-primary-ghost) 0%, #fdfdfc 100%);
   text-align: center;
-  padding: 2rem;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
-.error-message {
-  color: #c33;
-  background: #fee;
-  border: 1px solid #fcc;
+.empty-message .ff-icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  color: var(--ff-primary);
 }
 
-.results {
-  margin-top: 1rem;
-}
-
-.btn-start-labeling {
-  display: block;
-  width: 100%;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  background: #28a745;
-  color: white;
-  border: none;
-  border-radius: 6px;
+.empty-message-text {
   font-size: 1.1rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-start-labeling:hover {
-  background: #218838;
+  color: var(--ff-primary);
 }
 
 .table-wrapper {
+  border: 1px solid var(--ff-border);
+  border-radius: 12px;
   overflow: auto;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 .tx-table {
@@ -315,13 +350,13 @@ h1 {
 .tx-table th,
 .tx-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--ff-border);
   text-align: left;
 }
 
 .tx-table thead th {
-  background: #f8f9fb;
-  color: #444;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-text-muted);
   position: sticky;
   top: 0;
 }
@@ -331,46 +366,49 @@ h1 {
 }
 
 .status {
-  padding: 0.125rem 0.5rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
 }
+
 .status.unlabeled {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(231, 183, 91, 0.22);
+  color: #8a6728;
 }
 
 .btn-small {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-  background: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
-/* Debug styles */
-.debug-panel {
-  margin-top: 1rem;
+.btn-small:hover,
+.btn-small:focus-visible {
+  background: var(--ff-primary-ghost);
+  outline: none;
 }
-.btn-debug {
-  padding: 0.4rem 0.8rem;
-  background: #edf2f7;
-  color: #2d3748;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.btn-debug:hover { background: #e2e8f0; }
-.debug-content {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: #fff;
-  border: 1px dashed #cbd5e0;
-  border-radius: 6px;
-}
-.debug-table th:nth-child(2), .debug-table td:nth-child(2) { /* Owner ID column */
-  color: #4a5568;
+
+@media (max-width: 720px) {
+  .queue-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .queue-cta {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

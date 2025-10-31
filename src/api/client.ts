@@ -3,7 +3,8 @@ import axios, { AxiosInstance, AxiosError } from 'axios'
 
 // Use Vue CLI env var if provided, otherwise default to dev proxy path '/api'
 const API_BASE_URL = (process.env.VUE_APP_API_BASE as string | undefined) || '/api'
-
+// TO DO LATER
+// const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 export class ApiClient {
   private client: AxiosInstance
 
@@ -20,9 +21,32 @@ export class ApiClient {
       (response) => response,
       (error: AxiosError) => {
         if (error.response?.data) {
-          const errorData = error.response.data as { error?: string }
-          throw new Error(errorData.error || `HTTP ${error.response.status}: ${error.message}`)
+          const data = error.response.data as any
+          // Try several common shapes for error payloads
+          let extracted: string | undefined
+          if (typeof data === 'string') {
+            extracted = data
+          } else if (data && typeof data === 'object') {
+            // common keys
+            extracted = data.error || data.message || data.err || undefined
+            // sometimes backend logs include wrapped text; fallback to JSON
+            if (!extracted) {
+              try {
+                extracted = JSON.stringify(data)
+              } catch (_) {
+                extracted = String(data)
+              }
+            }
+          }
+
+          const status = error.response.status
+          const message = extracted || `HTTP ${status}: ${error.message}`
+          // surface the server payload to aid debugging
+          // eslint-disable-next-line no-console
+          console.error('[ApiClient] server error payload:', error.response.data)
+          throw new Error(message)
         }
+
         throw new Error(error.message || 'An unexpected error occurred')
       }
     )
