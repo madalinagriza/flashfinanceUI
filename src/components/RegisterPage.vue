@@ -73,9 +73,7 @@ const handleRegister = async () => {
 
 <template>
   <div class="register-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
+    <!-- Topbar removed: do not expose navigation on register page -->
     <div class="register-card">
       <h2>Create Account</h2>
       <p class="subtitle">Sign up for FlashFinance</p>
@@ -161,20 +159,7 @@ const handleRegister = async () => {
   padding: 2rem 1rem;
 }
 
-.topbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-}
-
-.btn-back {
-  background: rgba(255,255,255,0.9);
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
+/* Topbar and back button removed per design: register header shows only the logo in AppShell */
 
 .register-card {
   background: white;

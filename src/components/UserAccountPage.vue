@@ -198,10 +198,6 @@ const handleChangePassword = async () => {
         <h2>Profile Info</h2>
         <div class="profile-grid">
           <div>
-            <span class="label">User ID</span>
-            <p class="value">{{ accountUser.user_id }}</p>
-          </div>
-          <div>
             <span class="label">Email</span>
             <p class="value">{{ accountUser.email }}</p>
           </div>

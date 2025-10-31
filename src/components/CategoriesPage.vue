@@ -179,15 +179,14 @@ onMounted(() => {
         <div v-else>
           <div class="debug-info">
             <small style="color: #999;">
-              Categories loaded: {{ allCategories.length }} |
-              Your user ID: {{ user?.user_id }}
+              Categories loaded: {{ allCategories.length }}
             </small>
           </div>
           <div v-if="allCategories.length === 0" class="empty">
             No categories yet.
           </div>
           <ul v-else class="category-list">
-            <li v-for="(c, idx) in allCategories" :key="(c.category_id || c.name) + ':' + c.owner_id">
+            <li v-for="(c, idx) in allCategories" :key="c.category_id || c.name">
               <span class="dot"></span>
               <template v-if="editingIndex === idx">
                 <input v-model="editName" class="edit-input" />
@@ -197,7 +196,7 @@ onMounted(() => {
               </template>
               <template v-else>
                 <span class="name">{{ c.name }}</span>
-                <span class="owner-id"><code>{{ c.owner_id }}</code></span>
+                <!-- owner_id hidden in UI for privacy -->
                 <button class="btn-small" @click.prevent="viewCategory(c)">View</button>
                 <button class="btn-small" @click.prevent="startEdit(c, idx)">Edit</button>
               </template>
@@ -206,40 +205,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="list-card debug-card">
-        <h3>🐛 All Categories (Debug)</h3>
-        <div v-if="loading" class="loading">Loading…</div>
-        <div v-if="allCategories.length === 0" class="empty">
-          No categories found for your account.
-        </div>
-        <div v-else>
-          <div style="margin-bottom: 1rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.85em;">
-            <strong>Raw JSON response:</strong>
-            <pre style="margin-top: 0.5rem; overflow-x: auto;">{{ JSON.stringify(allCategories, null, 2) }}</pre>
-          </div>
-          <table class="debug-table">
-            <thead>
-              <tr>
-                <th>Category ID</th>
-                <th>Name</th>
-                <th>Owner ID</th>
-                <th>Is Yours?</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(c, idx) in allCategories" :key="idx">
-                <td><code>{{ c.category_id || '(none)' }}</code></td>
-                <td>{{ c.name || '(empty)' }}</td>
-                <td><code>{{ c.owner_id || '(empty)' }}</code></td>
-                <td>
-                  <span v-if="c.owner_id === user?.user_id" style="color: #28a745;">✓ Yes</span>
-                  <span v-else style="color: #999;">✗ No</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <!-- Debug card removed: raw JSON / debug table intentionally hidden in production UI -->
     </div>
   </div>
 </template>

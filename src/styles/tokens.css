@@ -1,0 +1,17 @@
+:root {
+  /* Color tokens */
+  --ff-primary: #658986;
+  --ff-accent: #CE6A6B;
+  --ff-success: #2E906D;
+  --ff-error: #942332;
+  --ff-bg: #E3E1DB;
+
+  /* Layout tokens */
+  --radius: 14px;
+  --gap: 12px;
+}
+
+/* Utility helpers */
+.bg-ff { background-color: var(--ff-bg); }
+.text-primary { color: var(--ff-primary); }
+.text-accent { color: var(--ff-accent); }

@@ -469,11 +469,7 @@ const goBack = () => {
         <header class="header">
           <div>
             <h1>{{ categoryName }}</h1>
-            <p class="subtitle">Category ID: <code>{{ categoryId }}</code></p>
-          </div>
-          <div class="meta">
-            <span>Owner</span>
-            <code>{{ ownerId }}</code>
+            <!-- Category ID removed from UI (kept internally) -->
           </div>
         </header>
 
@@ -541,9 +537,7 @@ const goBack = () => {
                   <td>{{ formatCurrency(tx.amount) }}</td>
                   <td>
                     <div class="tx-name">{{ tx.display_name || tx.tx_id }}</div>
-                    <div class="tx-id" v-if="tx.display_name && tx.display_name !== tx.tx_id">
-                      <code>{{ tx.tx_id }}</code>
-                    </div>
+                    <!-- Transaction ID hidden in UI for privacy; tx.tx_id still used internally -->
                   </td>
                   <td class="actions-cell">
                     <div v-if="moveState.txId === tx.tx_id" class="move-controls">
@@ -604,17 +598,7 @@ const goBack = () => {
           </div>
         </section>
 
-        <section class="debug" v-if="transactionsRaw || metricsRaw">
-          <h3>Debug Responses</h3>
-          <div v-if="metricsRaw" class="debug-block">
-            <h4>getMetricStats</h4>
-            <pre>{{ metricsRaw }}</pre>
-          </div>
-          <div v-if="transactionsRaw" class="debug-block">
-            <h4>listTransactions</h4>
-            <pre>{{ transactionsRaw }}</pre>
-          </div>
-        </section>
+        <!-- Debug responses removed from UI -->
       </div>
     </div>
   </div>

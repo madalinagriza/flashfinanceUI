@@ -65,9 +65,6 @@ const handleSignIn = async () => {
 
 <template>
   <div class="signin-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
     <div class="signin-card">
       <h2>Sign In</h2>
       <p class="subtitle">Welcome back to FlashFinance</p>
@@ -129,20 +126,7 @@ const handleSignIn = async () => {
   padding: 2rem 1rem;
 }
 
-.topbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-}
-
-.btn-back {
-  background: rgba(255,255,255,0.9);
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
+/* topbar/back button removed per design: sign-in header shows only the logo in AppShell */
 
 .signin-card {
   background: white;

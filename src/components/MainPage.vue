@@ -48,10 +48,7 @@ const emit = defineEmits<{
               {{ user.status }}
             </span>
           </div>
-          <div class="info-item">
-            <span class="label">User ID:</span>
-            <span class="value">{{ user.user_id }}</span>
-          </div>
+          <!-- User ID removed from UI for privacy -->
           <button class="btn-account" @click="emit('view-account', user)">View Personal Account Page</button>
         </div>
       </div>
@@ -64,9 +61,7 @@ const emit = defineEmits<{
       <button @click="emit('navigate', 'categories')" class="btn-secondary">
         Manage Categories
       </button>
-      <button @click="emit('signOut')" class="btn-signout">
-        Sign Out
-      </button>
+      <!-- Sign Out button moved to top-level navbar in App.vue -->
     </div>
   </div>
 </template>

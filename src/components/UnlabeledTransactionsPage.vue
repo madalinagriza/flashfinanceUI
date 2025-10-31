@@ -148,41 +148,7 @@ onMounted(fetchUnlabeledTransactions)
           </table>
         </div>
       </div>
-      <!-- Debug section: shows raw API payload with owner ids (always visible) -->
-      <div class="debug-panel">
-        <button class="btn-debug" type="button" @click="showDebug = !showDebug">
-          {{ showDebug ? 'Hide' : 'Show' }} Debug (Raw API Results)
-        </button>
-        <div v-if="showDebug" class="debug-content">
-          <p>Total returned by API (no client filtering): {{ transactions.length }}</p>
-          <div class="table-wrapper">
-            <table class="tx-table debug-table">
-              <thead>
-                <tr>
-                  <th>Tx ID</th>
-                  <th>Owner ID</th>
-                  <th>Date</th>
-                  <th>Merchant</th>
-                  <th class="right">Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="rtx in transactions" :key="rtx.tx_id">
-                  <td class="mono">{{ rtx.tx_id }}</td>
-                  <td class="mono">{{ rtx.owner_id }}</td>
-                  <td>{{ rtx.date }}</td>
-                  <td>{{ rtx.merchant_text }}</td>
-                  <td class="right">{{ formatCurrency(rtx.amount) }}</td>
-                  <td>
-                    <span class="status" :class="rtx.status.toLowerCase()">{{ rtx.status }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <!-- Debug panel removed: raw API results no longer shown in UI -->
     </div>
   </div>
 </template>

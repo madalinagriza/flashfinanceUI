@@ -1,0 +1,21 @@
+/* Global font assignments */
+html, body {
+  height: 100%;
+}
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background-color: #ffffff;
+  color: #111827;
+}
+/* Titles use Merriweather */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
+}
+/* Logo uses Nunito */
+.logo {
+  font-family: 'Nunito', 'Inter', sans-serif;
+}
+/* Monospace for numeric / code-like values */
+.mono, code, pre {
+  font-family: 'Roboto Mono', 'Courier New', monospace;
+}

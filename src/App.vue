@@ -9,6 +9,7 @@ import CategoriesPage from './components/CategoriesPage.vue'
 import CategoryDetailPage from './components/CategoryDetailPage.vue'
 import UnlabeledTransactionsPage from './components/UnlabeledTransactionsPage.vue'
 import LabelingPage from './components/LabelingPage.vue'
+import AppShell from './components/AppShell.vue'
 import type { CategoryNameOwner, Transaction, User } from './api'
 
 type Page =
@@ -46,6 +47,9 @@ const navigateTo = (page: Page | string) => {
     if (page === 'categories') {
       selectedCategory.value = null
     }
+    if (page === 'userAccount' && currentUser.value) {
+      selectedAccountUser.value = currentUser.value
+    }
   }
 }
 
@@ -57,6 +61,7 @@ const handleSignIn = (user: User) => {
 const handleSignOut = () => {
   currentUser.value = null
   selectedCategory.value = null
+  selectedAccountUser.value = null
   currentPage.value = 'signin'
 }
 
@@ -82,64 +87,45 @@ const handleAccountUpdated = (user: User) => {
 
 <template>
   <div class="app">
-    <nav class="navbar" v-if="currentPage !== 'main'">
-      <div class="nav-container">
-        <h1 class="logo">FlashFinance</h1>
-        <div class="nav-links">
-          <button 
-            @click="navigateTo('signin')" 
-            :class="{ active: currentPage === 'signin' }"
-            class="nav-btn"
-          >
-            Sign In
-          </button>
-          <button 
-            @click="navigateTo('register')" 
-            :class="{ active: currentPage === 'register' }"
-            class="nav-btn"
-          >
-            Register
-          </button>
-          
-        </div>
-      </div>
-    </nav>
-
-    <SignInPage 
-      v-if="currentPage === 'signin'" 
-      @navigate="navigateTo" 
-      @sign-in="handleSignIn"
-    />
-    <RegisterPage v-if="currentPage === 'register'" @navigate="navigateTo" />
-    <MainPage 
-      v-if="currentPage === 'main'" 
-      :user="currentUser" 
-      @sign-out="handleSignOut"
-      @navigate="navigateTo"
-      @view-account="handleViewAccount"
-    />
-    <ImportSpendingsPage v-if="currentPage === 'import'" :user="currentUser" @navigate="navigateTo" />
-    <CategoriesPage
-      v-if="currentPage === 'categories'"
-      :user="currentUser"
-      @navigate="navigateTo"
-      @view-category="handleViewCategory"
-    />
-    <CategoryDetailPage
-      v-if="currentPage === 'categoryDetail'"
-      :user="currentUser"
-      :category="selectedCategory"
-      @navigate="navigateTo"
-    />
-    <UnlabeledTransactionsPage v-if="currentPage === 'unlabeled'" :user="currentUser" @navigate="navigateTo" @start-labeling="handleStartLabeling" />
-    <LabelingPage v-if="currentPage === 'labeling'" :transaction="transactionToLabel" :user="currentUser" @navigate="navigateTo" />
-    <UserAccountPage
-      v-if="currentPage === 'userAccount'"
-      :user="selectedAccountUser"
-      @navigate="navigateTo"
-      @user-updated="handleAccountUpdated"
-      @sign-out="handleSignOut"
-    />
+  <AppShell :user="currentUser" @navigate="navigateTo" @sign-out="handleSignOut">
+      <template #default>
+        <SignInPage 
+          v-if="currentPage === 'signin'" 
+          @navigate="navigateTo" 
+          @sign-in="handleSignIn"
+        />
+        <RegisterPage v-else-if="currentPage === 'register'" @navigate="navigateTo" />
+        <MainPage 
+          v-else-if="currentPage === 'main'" 
+          :user="currentUser" 
+          @sign-out="handleSignOut"
+          @navigate="navigateTo"
+          @view-account="handleViewAccount"
+        />
+        <ImportSpendingsPage v-else-if="currentPage === 'import'" :user="currentUser" @navigate="navigateTo" />
+        <CategoriesPage
+          v-else-if="currentPage === 'categories'"
+          :user="currentUser"
+          @navigate="navigateTo"
+          @view-category="handleViewCategory"
+        />
+        <CategoryDetailPage
+          v-else-if="currentPage === 'categoryDetail'"
+          :user="currentUser"
+          :category="selectedCategory"
+          @navigate="navigateTo"
+        />
+        <UnlabeledTransactionsPage v-else-if="currentPage === 'unlabeled'" :user="currentUser" @navigate="navigateTo" @start-labeling="handleStartLabeling" />
+        <LabelingPage v-else-if="currentPage === 'labeling'" :transaction="transactionToLabel" :user="currentUser" @navigate="navigateTo" />
+        <UserAccountPage
+          v-else-if="currentPage === 'userAccount'"
+          :user="selectedAccountUser"
+          @navigate="navigateTo"
+          @user-updated="handleAccountUpdated"
+          @sign-out="handleSignOut"
+        />
+      </template>
+    </AppShell>
   </div>
 </template>
 
@@ -183,9 +169,17 @@ body {
   margin: 0;
 }
 
+.logo a {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-block;
+}
+
 .nav-links {
   display: flex;
   gap: 0.5rem;
+  align-items: center; /* ensure children are vertically centered */
 }
 
 .nav-btn {
@@ -198,6 +192,7 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   font-weight: 500;
+  line-height: 1; /* normalize line-height for consistent vertical alignment */
 }
 
 .nav-btn:hover {
@@ -208,6 +203,20 @@ body {
 .nav-btn.active {
   background: #667eea;
   color: white;
+}
+
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: #444;
+  line-height: 1;
+}
+
+.nav-btn.signout {
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
 }
 
 .nav-btn.active:hover {
