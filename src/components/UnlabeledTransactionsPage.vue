@@ -87,168 +87,260 @@ onMounted(fetchUnlabeledTransactions)
 </script>
 
 <template>
-  <div class="unlabeled-tx-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
-    <div class="container">
-      <div class="header">
-        <h1>Unlabeled Transactions</h1>
-        <button class="btn-refresh" @click="fetchUnlabeledTransactions" :disabled="loading">
-          {{ loading ? 'Refreshing…' : '🔄 Refresh' }}
-        </button>
-      </div>
+  <div class="unlabeled-tx-page ff-page">
+    <div class="ff-page-frame">
+      <header class="ff-page-header queue-header">
+        <div class="header-stack">
+          <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
+            <span class="ff-icon icon-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.5 4.5L7 10l5.5 5.5" />
+              </svg>
+            </span>
+            Back to Dashboard
+          </button>
+          <div class="heading-copy">
+            <h1>Unlabeled Transactions</h1>
+            <p class="ff-page-subtitle">Review new activity and launch a labeling session to keep categories fresh.</p>
+          </div>
+        </div>
+        <div class="ff-header-actions">
+          <button type="button" class="header-refresh" @click="fetchUnlabeledTransactions" :disabled="loading">
+            <span class="ff-icon icon-refresh" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 10a7 7 0 0 0-7-7 7 7 0 0 0-6.6 4.8" />
+                <path d="M6 4h-3V1" />
+                <path d="M3 10a7 7 0 0 0 7 7 7 7 0 0 0 6.6-4.8" />
+                <path d="M14 16h3v3" />
+              </svg>
+            </span>
+            <span>{{ loading ? 'Refreshing…' : 'Refresh' }}</span>
+          </button>
+        </div>
+      </header>
 
-      <div v-if="error" class="error-message">❌ {{ error }}</div>
-      <div v-else-if="loading" class="loading-message">Loading transactions…</div>
-      <!-- If API returned items but none match current user, surface a helpful hint -->
-      <div
-        v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
-        class="error-message"
-      >
-        We fetched {{ transactions.length }} item(s), but none belong to the current user.
-        This usually means the backend returned transactions with a different owner_id.
-      </div>
-      <div v-else-if="displayedTransactions.length === 0" class="empty-message">
-        🎉 All transactions are labeled!
-      </div>
-      <div v-else class="results">
-        <p>You have {{ displayedTransactions.length }} transaction(s) to label.</p>
-        <button
-          class="btn-start-labeling"
-          @click="emit('start-labeling', displayedTransactions[0])"
-          v-if="displayedTransactions.length > 0"
-        >
-          Start Labeling Session
-        </button>
-        <div class="table-wrapper">
-          <table class="tx-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Merchant</th>
-                <th class="right">Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
-                <td>{{ tx.date }}</td>
-                <td>{{ tx.merchant_text }}</td>
-                <td class="right">{{ formatCurrency(tx.amount) }}</td>
-                <td>
-                  <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
-                </td>
-                <td>
-                  <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="ff-page-grid">
+        <div class="ff-column">
+          <section class="ff-card queue-card">
+            <div class="queue-top">
+              <div class="queue-summary">
+                <h2 class="ff-card-title">Queue overview</h2>
+                <p class="ff-card-subtitle">{{ displayedTransactions.length }} transaction<span v-if="displayedTransactions.length !== 1">s</span> awaiting labels.</p>
+              </div>
+              <button
+                v-if="displayedTransactions.length > 0"
+                type="button"
+                class="action-button secondary"
+                @click="emit('start-labeling', displayedTransactions[0])"
+              >
+                Start labeling session
+              </button>
+            </div>
+
+            <div v-if="error" class="banner error">
+              <span class="ff-icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ error }}
+            </div>
+            <div v-else-if="loading" class="loading-message">Loading transactions…</div>
+            <div
+              v-else-if="transactions.length > 0 && displayedTransactions.length === 0"
+              class="banner warning"
+            >
+              <span class="ff-icon icon-warning" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 3.2l7.2 12.6a1 1 0 0 1-.87 1.5H3.67a1 1 0 0 1-.87-1.5L10 3.2z" />
+                  <path d="M10 8v3.8" />
+                  <path d="M10 14.8h.01" />
+                </svg>
+              </span>
+              We fetched {{ transactions.length }} item(s), but none belong to the current user. This usually means the backend returned transactions with a different owner ID.
+            </div>
+            <div v-else-if="displayedTransactions.length === 0" class="empty-message">
+              <span class="ff-icon icon-check" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              All transactions are labeled!
+            </div>
+            <div v-else class="table-wrapper">
+              <table class="tx-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Merchant</th>
+                    <th class="right">Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="tx in displayedTransactions" :key="tx.tx_id">
+                    <td>{{ tx.date }}</td>
+                    <td>{{ tx.merchant_text }}</td>
+                    <td class="right">{{ formatCurrency(tx.amount) }}</td>
+                    <td>
+                      <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
+                    </td>
+                    <td>
+                      <button class="btn-small" @click="emit('start-labeling', tx)">Label</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="ff-column">
+          <section class="ff-card compact summary-card">
+            <h3 class="summary-title">Queue tips</h3>
+            <ul class="notes-list">
+              <li>Start a session to label items sequentially.</li>
+              <li>Use category shortcuts inside the labeling screen to move faster.</li>
+              <li>Refresh the queue after importing new transactions.</li>
+            </ul>
+          </section>
+          <section class="ff-card compact summary-card" v-if="displayedTransactions.length">
+            <h3 class="summary-title">At a glance</h3>
+            <p class="ff-summary">{{ displayedTransactions.length }} pending label<span v-if="displayedTransactions.length !== 1">s</span>.</p>
+            <p class="ff-summary">Oldest transaction: {{ displayedTransactions[displayedTransactions.length - 1]?.date ?? '—' }}</p>
+          </section>
         </div>
       </div>
-      <!-- Debug panel removed: raw API results no longer shown in UI -->
     </div>
   </div>
 </template>
 
 <style scoped>
-.unlabeled-tx-page {
-  min-height: calc(100vh - 70px);
-  background: #f5f7fa;
-  padding: 2rem 1rem;
+.queue-header {
+  align-items: flex-start;
 }
 
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-}
-
-.btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
-
-.container {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.header {
+.header-stack {
   display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.heading-copy h1 {
+  margin: 0;
+  color: var(--ff-primary);
+}
+
+.header-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.header-refresh:hover,
+.header-refresh:focus-visible {
+  background: var(--ff-secondary-hover);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.header-refresh:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.queue-card {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.queue-top {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
 
-h1 {
-  font-size: 2rem;
-  color: #333;
-  margin: 0;
+.queue-summary {
+  max-width: 32rem;
+  display: grid;
+  gap: 0.35rem;
 }
 
-.btn-refresh {
-  padding: 0.5rem 0.9rem;
-  background: #667eea;
-  color: white;
+.action-button {
+  border-radius: 999px;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.error-message,
-.loading-message,
-.empty-message {
-  margin-top: 2rem;
-  text-align: center;
-  padding: 2rem;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-}
-
-.error-message {
-  color: #c33;
-  background: #fee;
-  border: 1px solid #fcc;
-}
-
-.results {
-  margin-top: 1rem;
-}
-
-.btn-start-labeling {
-  display: block;
-  width: 100%;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  background: #28a745;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1.1rem;
+  padding: 0.75rem 1.6rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.btn-start-labeling:hover {
-  background: #218838;
+.action-button.secondary {
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+}
+
+.action-button.secondary:hover,
+.action-button.secondary:focus-visible {
+  background: var(--ff-secondary-hover);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border-radius: 10px;
+  padding: 0.75rem 0.95rem;
+  font-size: 0.95rem;
+}
+
+.banner.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
+}
+
+.banner.warning {
+  background: var(--ff-warning, rgba(231, 183, 91, 0.18));
+  border: 1px solid rgba(231, 183, 91, 0.32);
+  color: #8a6728;
+}
+
+.loading-message {
+  color: var(--ff-text-muted);
+  font-size: 0.95rem;
+}
+
+.empty-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
 }
 
 .table-wrapper {
+  border: 1px solid var(--ff-border);
+  border-radius: 12px;
   overflow: auto;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 .tx-table {
@@ -260,13 +352,13 @@ h1 {
 .tx-table th,
 .tx-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--ff-border);
   text-align: left;
 }
 
 .tx-table thead th {
-  background: #f8f9fb;
-  color: #444;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-text-muted);
   position: sticky;
   top: 0;
 }
@@ -276,46 +368,66 @@ h1 {
 }
 
 .status {
-  padding: 0.125rem 0.5rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
 }
+
 .status.unlabeled {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(231, 183, 91, 0.22);
+  color: #8a6728;
 }
 
 .btn-small {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-  background: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
-/* Debug styles */
-.debug-panel {
-  margin-top: 1rem;
+.btn-small:hover,
+.btn-small:focus-visible {
+  background: var(--ff-primary-ghost);
+  outline: none;
 }
-.btn-debug {
-  padding: 0.4rem 0.8rem;
-  background: #edf2f7;
-  color: #2d3748;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  cursor: pointer;
+
+.summary-card {
+  display: grid;
+  gap: 0.75rem;
 }
-.btn-debug:hover { background: #e2e8f0; }
-.debug-content {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: #fff;
-  border: 1px dashed #cbd5e0;
-  border-radius: 6px;
+
+.summary-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1.1rem;
 }
-.debug-table th:nth-child(2), .debug-table td:nth-child(2) { /* Owner ID column */
-  color: #4a5568;
+
+.notes-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ff-text-muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .queue-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-button.secondary {
+    width: 100%;
+  }
 }
 </style>

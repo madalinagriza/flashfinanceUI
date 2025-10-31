@@ -439,7 +439,14 @@ const goBack = () => {
 <template>
   <div class="category-detail">
     <div class="topbar">
-      <button class="btn-back" type="button" @click="goBack">← Back to Categories</button>
+      <button class="btn-back" type="button" @click="goBack">
+        <span class="icon icon-arrow" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.5 4.5L7 10l5.5 5.5" />
+          </svg>
+        </span>
+        Back to Categories
+      </button>
     </div>
 
     <div class="container">
@@ -607,7 +614,7 @@ const goBack = () => {
 <style scoped>
 .category-detail {
   min-height: calc(100vh - 70px);
-  background: #f5f7fa;
+  background: var(--ff-background);
   padding: 2rem 1rem;
 }
 
@@ -619,12 +626,20 @@ const goBack = () => {
 }
 
 .btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  border: 1px solid var(--ff-primary-border-strong);
   border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.9rem;
   cursor: pointer;
+  transition: background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-back:hover {
+  background: var(--ff-primary-ghost);
 }
 
 .container {
@@ -633,21 +648,26 @@ const goBack = () => {
 }
 
 .empty-state {
-  background: #fff;
+  background: var(--ff-surface);
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
 .btn-primary {
   margin-top: 1rem;
   padding: 0.75rem 2rem;
-  background: #667eea;
-  color: #fff;
+  background: var(--ff-primary);
+  color: var(--ff-surface);
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--ff-primary-hover);
 }
 
 .content {
@@ -657,10 +677,10 @@ const goBack = () => {
 }
 
 .header {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--ff-surface);
+  border-radius: 12px;
   padding: 1.75rem;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -669,28 +689,28 @@ const goBack = () => {
 
 .subtitle {
   margin-top: 0.5rem;
-  color: #666;
+  color: var(--ff-text-muted);
   font-size: 0.95rem;
 }
 
 .meta {
   text-align: right;
-  color: #555;
+  color: var(--ff-text-subtle);
   font-size: 0.9rem;
 }
 
 .meta code {
   display: block;
   margin-top: 0.35rem;
-  background: #f5f5f5;
+  background: var(--ff-overlay);
   padding: 0.3rem 0.5rem;
   border-radius: 4px;
 }
 
 .metrics,
 .history {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--ff-surface);
+  border: 1px solid var(--ff-border);
   border-radius: 10px;
   padding: 1.25rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -716,25 +736,32 @@ const goBack = () => {
   display: flex;
   flex-direction: column;
   font-size: 0.85rem;
-  color: #4a5568;
+  color: var(--ff-text-subtle);
   gap: 0.35rem;
 }
 
 .metrics-filter input[type="date"] {
   padding: 0.35rem 0.5rem;
-  border: 1px solid #cbd5e0;
+  border: 1px solid var(--ff-primary-border-strong);
   border-radius: 6px;
   font-size: 0.9rem;
+  background: var(--ff-background);
+  color: var(--ff-text-base);
 }
 
 .btn-apply {
   padding: 0.45rem 0.9rem;
-  background: #3182ce;
-  color: #fff;
+  background: var(--ff-secondary-soft);
+  color: var(--ff-surface);
   border: none;
   border-radius: 6px;
   font-size: 0.9rem;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-apply:hover {
+  background: var(--ff-secondary-hover);
 }
 
 .btn-apply:disabled {
@@ -743,16 +770,16 @@ const goBack = () => {
 }
 
 .metrics-error {
-  color: #b83280;
-  background: #fff5f7;
-  border: 1px solid #fed7e2;
+  color: var(--ff-error);
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
   border-radius: 6px;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.75rem;
 }
 
 .metrics-loading {
-  color: #4a5568;
+  color: var(--ff-text-base);
   font-size: 0.95rem;
 }
 
@@ -790,36 +817,36 @@ const goBack = () => {
 .history-table td {
   text-align: left;
   padding: 0.6rem 0.45rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--ff-border);
 }
 
 .history-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--ff-primary-ghost);
 }
 
 .tx-name {
   font-weight: 600;
-  color: #2d3748;
+  color: var(--ff-text-base);
 }
 
 .tx-id {
   font-size: 0.8rem;
-  color: #718096;
+  color: var(--ff-text-subtle);
 }
 
 .empty,
 .loading,
 .error {
-  color: #6b7280;
+  color: var(--ff-text-muted);
 }
 
 .error {
-  color: #b91c1c;
+  color: var(--ff-error);
 }
 
 .debug {
-  background: #f8fafc;
-  border: 1px dashed #94a3b8;
+  background: var(--ff-surface);
+  border: 1px dashed var(--ff-primary-border-strong);
   border-radius: 10px;
   padding: 1rem;
   font-family: monospace;
@@ -840,15 +867,15 @@ const goBack = () => {
 }
 
 .notice-success {
-  background: #f0fff4;
-  border-color: #9ae6b4;
-  color: #22543d;
+  background: var(--ff-success-soft);
+  border-color: var(--ff-success-border);
+  color: var(--ff-success);
 }
 
 .notice-error {
-  background: #fff5f5;
-  border-color: #feb2b2;
-  color: #742a2a;
+  background: var(--ff-error-soft);
+  border-color: var(--ff-error-border);
+  color: var(--ff-error);
 }
 
 .actions-cell {
@@ -868,9 +895,9 @@ const goBack = () => {
 }
 
 .btn-move {
-  background: #e0e7ff;
-  border-color: #c7d2fe;
-  color: #3730a3;
+  background: var(--ff-primary-ghost);
+  border-color: var(--ff-primary-border-strong);
+  color: var(--ff-primary);
 }
 
 .btn-move:disabled {
@@ -887,7 +914,9 @@ const goBack = () => {
   width: 100%;
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
-  border: 1px solid #cbd5e0;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-background);
+  color: var(--ff-text-base);
   font-size: 0.85rem;
 }
 
@@ -897,9 +926,9 @@ const goBack = () => {
 }
 
 .btn-confirm {
-  background: #38a169;
-  border-color: #2f855a;
-  color: #fff;
+  background: var(--ff-primary);
+  border-color: var(--ff-primary-border-strong);
+  color: var(--ff-surface);
 }
 
 .btn-confirm:disabled {
@@ -908,15 +937,15 @@ const goBack = () => {
 }
 
 .btn-cancel {
-  background: #edf2f7;
-  border-color: #cbd5e0;
-  color: #2d3748;
+  background: var(--ff-surface);
+  border-color: var(--ff-border);
+  color: var(--ff-text-base);
 }
 
 .btn-delete {
-  background: #fed7d7;
-  border-color: #feb2b2;
-  color: #9b2c2c;
+  background: var(--ff-error-soft);
+  border-color: var(--ff-error-border);
+  color: var(--ff-error);
 }
 
 .btn-delete:disabled {
@@ -925,7 +954,7 @@ const goBack = () => {
 }
 
 .move-error {
-  color: #c53030;
+  color: var(--ff-error);
   font-size: 0.8rem;
 }
 
@@ -944,5 +973,22 @@ const goBack = () => {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-arrow {
+  color: var(--ff-primary);
 }
 </style>

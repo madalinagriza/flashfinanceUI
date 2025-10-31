@@ -1,32 +1,31 @@
 <template>
   <v-app>
-  <v-app-bar :style="`background: white; color: #1f2933; height: 270px;`" elevated>
-      <v-app-bar-nav-icon v-if="user" @click="drawer = !drawer" />
-      <v-container class="app-bar-inner" style="max-width:1000px; display:flex; align-items:center;">
+    <v-app-bar class="app-bar" elevated>
+      <div class="app-bar-inner">
         <div class="brand-wrap">
-          <span class="tt-logo logo" @click.prevent="$emit('navigate', 'main')">FlashFinance</span>
+          <span class="tt-logo logo" @click.prevent="handleBrandClick">FlashFinance</span>
         </div>
 
-        <div style="flex:1"></div>
+        <div class="app-bar-spacer"></div>
 
         <!-- Right-side area: show authenticated nav/actions or auth links when not signed in -->
-        <div class="app-right" v-if="user">
+        <div class="app-right" v-if="isAuthenticated">
           <nav class="app-nav">
             <button type="button" class="nav-link" @click="$emit('navigate', 'categories')">Categories</button>
             <button type="button" class="nav-link" @click="$emit('navigate', 'userAccount')">Account</button>
-            <button type="button" class="nav-link nav-link--outline" @click="$emit('sign-out')">Sign Out</button>
+            <button type="button" class="nav-link nav-link--signout" @click="$emit('sign-out')">Sign Out</button>
           </nav>
         </div>
         <div class="app-right" v-else>
           <div class="app-auth-links">
             <button type="button" class="nav-link" @click="$emit('navigate', 'signin')">Sign In</button>
-            <button type="button" class="nav-link nav-link--outline" @click="$emit('navigate', 'register')">Register</button>
+            <button type="button" class="nav-link nav-link--accent" @click="$emit('navigate', 'register')">Register</button>
           </div>
         </div>
-      </v-container>
+      </div>
     </v-app-bar>
 
-    <v-main :style="`background: var(--ff-bg);`">
+    <v-main :style="`background: var(--ff-background);`">
       <v-container fluid>
         <slot />
       </v-container>
@@ -35,8 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-const drawer = ref(false)
+import { computed } from 'vue'
 const props = defineProps<{
   user: any | null
 }>()
@@ -45,27 +43,80 @@ const emit = defineEmits<{
   (e: 'sign-out'): void
 }>()
 
-// expose user locally for template convenience
-// const user = props.user // This was the bug - it was not reactive.
+const isAuthenticated = computed(() => Boolean(props.user))
+
+const handleBrandClick = () => {
+  if (!isAuthenticated.value) return
+  emit('navigate', 'main')
+}
 </script>
 
 <style scoped>
-.brand-wrap { display:flex; align-items:center; flex: 0 0 auto; height: 100%; padding-left: 18px; }
-.logo { cursor: pointer; font-weight: 900; font-size: 3.15rem; line-height: 1; font-style: italic; color: #1f2933; }
-.app-right { display:flex; align-items:center; gap: 12px; height: 100%; }
-.app-right { display:flex; align-items:center; gap: 12px; }
-.app-nav { display:flex; align-items:center; gap: 12px; }
-.app-auth-links { display:flex; align-items:center; gap: 12px; }
-.app-actions { display:flex; align-items:center; gap: 8px; }
-.signout-btn { color: white; border-color: rgba(255,255,255,0.25); font-size: 0.9rem; }
+.app-bar {
+  background: var(--ff-primary);
+  color: var(--ff-surface);
+  height: var(--ff-app-bar-height);
+  min-height: var(--ff-app-bar-height);
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 6px rgba(17, 24, 39, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  transition: height 180ms ease;
+}
+
+.app-bar-inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 22px;
+}
+
+.app-bar-spacer {
+  flex: 1;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.logo {
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 2.25rem;
+  line-height: 1;
+  font-style: italic;
+  color: var(--ff-surface);
+  transition: transform 180ms ease;
+}
+
+.logo:hover {
+  transform: translateY(-2px);
+}
+
+.app-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-nav,
+.app-auth-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nav-link {
   appearance: none;
-  border: none;
-  background: transparent;
-  color: #1f2933;
-  font-size: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ff-surface);
+  font-size: 0.95rem;
   font-weight: 600;
-  padding: 0.45rem 1rem;
+  padding: 0.38rem 0.95rem;
   border-radius: 999px;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -73,40 +124,78 @@ const emit = defineEmits<{
 
 .nav-link:hover,
 .nav-link:focus-visible {
-  background: rgba(31, 41, 51, 0.08);
+  background: rgba(255, 255, 255, 0.22);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(31, 41, 51, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
-.nav-link--outline {
-  border: 1px solid rgba(31, 41, 51, 0.5);
-  background: rgba(31, 41, 51, 0.06);
+.nav-link--accent,
+.nav-link--signout {
+  background: var(--ff-secondary-soft);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--ff-surface);
 }
 
-.app-auth-links .nav-link {
-  color: #213547;
+.nav-link--accent:hover,
+.nav-link--accent:focus-visible {
+  background: var(--ff-secondary);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
-.app-auth-links .nav-link--outline {
-  background: rgba(33, 53, 71, 0.08);
-  border-color: rgba(33, 53, 71, 0.4);
+.nav-link--signout {
+  background: rgba(196, 76, 76, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--ff-surface);
 }
 
-.app-auth-links .nav-link--outline:hover,
-.app-auth-links .nav-link--outline:focus-visible {
-  background: rgba(33, 53, 71, 0.16);
+.nav-link--signout:hover,
+.nav-link--signout:focus-visible {
+  background: rgba(196, 76, 76, 0.26);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.26);
 }
 
-/* Ensure navigation drawer list is left aligned and readable */
-v-navigation-drawer >>> .v-list {
-  padding-top: 0.5rem;
+@media (max-width: 900px) {
+  .app-bar-inner {
+    padding: 0 18px;
+    gap: 14px;
+  }
+
+  .logo {
+    font-size: 2rem;
+  }
+
+  .nav-link {
+    font-size: 0.9rem;
+    padding: 0.35rem 0.85rem;
+  }
 }
 
-/* Small responsive tweaks */
 @media (max-width: 600px) {
-  .app-actions v-btn {
-    font-size: 0.85rem;
-    padding: 6px 8px;
+  .app-bar {
+    height: auto;
+    min-height: 54px;
+  }
+
+  .app-bar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .app-bar-spacer {
+    display: none;
+  }
+
+  .app-right {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+
+  .nav-link {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

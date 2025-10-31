@@ -85,110 +85,160 @@ const handleFileChange = async (event: Event) => {
 </script>
 
 <template>
-  <div class="import-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
-    <div class="container">
-      <h1>Import Spendings</h1>
-      <p>Upload a CSV file or paste its contents below to import your transactions.</p>
-      <form @submit.prevent="handleUpload" class="import-form">
-        <label class="file-picker">
-          <span class="file-picker-label">Select CSV file</span>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            @change="handleFileChange"
-            :disabled="loading || fileReading"
-          />
-        </label>
-        <div v-if="lastFileName" class="file-status">
-          Loaded: <strong>{{ lastFileName }}</strong>
-          <span v-if="fileReading">(reading…)</span>
-          <div class="hint">Click "Import CSV" to begin importing the loaded file.</div>
+  <div class="import-page ff-page">
+    <div class="ff-page-frame">
+      <header class="ff-page-header import-header">
+        <div class="header-stack">
+          <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
+            <span class="ff-icon icon-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.5 4.5L7 10l5.5 5.5" />
+              </svg>
+            </span>
+            Back to Dashboard
+          </button>
+          <div class="heading-copy">
+            <h1>Import Transactions</h1>
+            <p class="ff-page-subtitle">Upload a CSV file or paste its contents to bring new spendings into FlashFinance.</p>
+          </div>
         </div>
-        <textarea
-          v-model="csvContent"
-          placeholder="Paste CSV content here..."
-          rows="10"
-          class="csv-textarea"
-        ></textarea>
-        <div v-if="error" class="error-message">❌ {{ error }}</div>
-        <button type="submit" class="btn-upload" :disabled="loading || fileReading">
-          {{ (loading || fileReading) ? 'Importing…' : 'Import CSV' }}
-        </button>
-      </form>
+        <div class="ff-header-actions">
+          <button type="button" class="header-link" @click="emit('navigate', 'unlabeled')">View unlabeled queue</button>
+        </div>
+      </header>
 
-      <div v-if="transactions.length > 0" class="results">
-        <h2>Imported Transactions ({{ transactions.length }})</h2>
-        <div class="table-wrapper">
-          <table class="tx-table">
-            <thead>
-              <tr>
-                <th>Tx ID</th>
-                <th>Date</th>
-                <th>Merchant</th>
-                <th class="right">Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="tx in transactions" :key="tx.tx_id">
-                <td class="mono">{{ tx.tx_id }}</td>
-                <td>{{ tx.date }}</td>
-                <td>{{ tx.merchant_text }}</td>
-                <td class="right">{{ tx.amount.toFixed(2) }}</td>
-                <td>
-                  <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="ff-page-grid">
+        <div class="ff-column">
+          <section class="ff-card import-card">
+            <h2 class="ff-card-title">Upload or paste your CSV</h2>
+            <p class="ff-card-subtitle">Choose a file from your computer or paste the contents directly. Click import once you're ready.</p>
+            <form @submit.prevent="handleUpload" class="import-form">
+              <label class="file-picker">
+                <span class="file-picker-label">Select CSV file</span>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  @change="handleFileChange"
+                  :disabled="loading || fileReading"
+                />
+              </label>
+              <p v-if="lastFileName" class="file-status">
+                Loaded <strong>{{ lastFileName }}</strong>
+                <span v-if="fileReading">(reading…)</span>
+                <span class="hint">Click “Import CSV” after reviewing the preview below.</span>
+              </p>
+              <textarea
+                v-model="csvContent"
+                placeholder="Paste CSV content here..."
+                rows="10"
+                class="csv-textarea"
+              ></textarea>
+              <div v-if="error" class="banner error">
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                  </svg>
+                </span>
+                {{ error }}
+              </div>
+              <button type="submit" class="action-button primary" :disabled="loading || fileReading">
+                {{ (loading || fileReading) ? 'Importing…' : 'Import CSV' }}
+              </button>
+            </form>
+          </section>
         </div>
+
+        <div class="ff-column">
+          <section class="ff-card compact import-notes">
+            <h3 class="notes-title">Import tips</h3>
+            <ul class="notes-list">
+              <li>Ensure your CSV includes headers like date, amount, merchant.</li>
+              <li>Amounts should use positive numbers for debits and negative for credits.</li>
+              <li>After importing, review the unlabeled queue to categorize new spendings.</li>
+            </ul>
+          </section>
+          <section class="ff-card compact status-card" v-if="csvContent">
+            <h3 class="notes-title">Import summary</h3>
+            <p class="ff-summary">Current paste length: {{ csvContent.length.toLocaleString() }} characters.</p>
+            <p class="ff-summary">Remember to remove column headers if your file contains duplicates.</p>
+          </section>
+        </div>
+
+        <section v-if="transactions.length > 0" class="ff-card results-card ff-full-width">
+          <div class="results-header">
+            <h2 class="ff-card-title">Imported transactions</h2>
+            <span class="badge">{{ transactions.length }}</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="tx-table">
+              <thead>
+                <tr>
+                  <th>Tx ID</th>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th class="right">Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tx in transactions" :key="tx.tx_id">
+                  <td class="mono">{{ tx.tx_id }}</td>
+                  <td>{{ tx.date }}</td>
+                  <td>{{ tx.merchant_text }}</td>
+                  <td class="right">{{ tx.amount.toFixed(2) }}</td>
+                  <td>
+                    <span class="status" :class="tx.status.toLowerCase()">{{ tx.status }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.import-page {
-  min-height: calc(100vh - 70px);
-  background: #f5f7fa;
-  padding: 2rem 1rem;
+.import-header {
+  align-items: flex-start;
 }
 
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
+.header-stack {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
-.btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+.heading-copy h1 {
+  margin: 0;
+  color: var(--ff-primary);
+}
+
+.header-link {
+  background: none;
+  border: none;
+  color: var(--ff-secondary);
+  font-weight: 600;
   cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
 }
 
-.container {
-  max-width: 800px;
-  margin: 0 auto;
-  text-align: center;
+.header-link:hover,
+.header-link:focus-visible {
+  color: var(--ff-secondary-hover);
+  outline: none;
 }
 
-h1 {
-  font-size: 2rem;
-  color: #333;
-  margin-bottom: 1rem;
+.import-card {
+  display: grid;
+  gap: 1.5rem;
 }
 
 .import-form {
-  margin: 2rem 0 1.5rem 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1rem;
 }
 
@@ -198,18 +248,18 @@ h1 {
   justify-content: center;
   gap: 0.75rem;
   padding: 0.75rem 1.5rem;
-  border: 1px dashed #ccd3e0;
-  border-radius: 6px;
-  background: #fff;
-  color: #3a4a63;
+  border: 1px dashed var(--ff-primary-border-strong);
+  border-radius: 10px;
+  background: var(--ff-surface);
+  color: var(--ff-text-base);
   cursor: pointer;
-  align-self: center;
-  transition: border-color 0.2s, color 0.2s;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
 .file-picker:hover {
-  border-color: #667eea;
-  color: #2d3a58;
+  border-color: var(--ff-primary);
+  color: var(--ff-primary);
+  background: var(--ff-primary-ghost);
 }
 
 .file-picker input {
@@ -222,54 +272,116 @@ h1 {
 
 .file-status {
   font-size: 0.9rem;
-  color: #4a5568;
+  color: var(--ff-text-muted);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: var(--ff-text-subtle);
 }
 
 .csv-textarea {
   width: 100%;
-  min-height: 180px;
+  min-height: 200px;
   font-family: monospace;
   font-size: 1rem;
   padding: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  border: 1px solid var(--ff-primary-border-strong);
+  border-radius: 10px;
   resize: vertical;
+  background: var(--ff-background);
+  color: var(--ff-text-base);
 }
 
-.btn-upload {
-  padding: 0.75rem 2rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-upload:hover {
-  background: #5568d3;
-}
-
-.error-message {
-  color: #c33;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  padding: 0.75rem;
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 10px;
+  padding: 0.75rem 0.95rem;
   font-size: 0.95rem;
 }
 
-.results {
-  margin-top: 2rem;
-  text-align: left;
+.banner.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
+}
+
+.action-button {
+  border-radius: 999px;
+  border: none;
+  padding: 0.75rem 1.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.action-button.primary {
+  background: var(--ff-primary);
+  color: var(--ff-surface);
+}
+
+.action-button.primary:hover,
+.action-button.primary:focus-visible {
+  background: var(--ff-primary-hover);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.import-notes {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.notes-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1.1rem;
+}
+
+.notes-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ff-text-muted);
+  line-height: 1.6;
+}
+
+.status-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.results-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .table-wrapper {
   overflow: auto;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  border-radius: 12px;
+  border: 1px solid var(--ff-border);
 }
 
 .tx-table {
@@ -278,27 +390,57 @@ h1 {
   font-size: 0.95rem;
 }
 
-.tx-table th, .tx-table td {
+.tx-table th,
+.tx-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--ff-border);
+  text-align: left;
 }
 
 .tx-table thead th {
-  background: #f8f9fb;
-  color: #444;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-text-muted);
   position: sticky;
   top: 0;
 }
 
-.mono { font-family: monospace; font-size: 0.85rem; }
-.right { text-align: right; }
+.right {
+  text-align: right;
+}
 
 .status {
-  padding: 0.125rem 0.5rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  display: inline-flex;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
   font-weight: 600;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
 }
-.status.unlabeled { background: #fff3cd; color: #856404; }
-.status.labeled { background: #d4edda; color: #155724; }
+
+.status.unlabeled {
+  background: rgba(231, 183, 91, 0.22);
+  color: #8a6728;
+}
+
+.status.labeled {
+  background: var(--ff-success-soft);
+  color: var(--ff-success);
+}
+
+@media (max-width: 720px) {
+  .header-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-link {
+    align-self: flex-start;
+  }
+
+  .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
 </style>

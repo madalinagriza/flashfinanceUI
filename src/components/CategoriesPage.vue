@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { categoryApi } from '../api'
 import type { User, CategoryNameOwner } from '../api'
 import { normalizeId } from '../utils/normalize'
@@ -24,6 +24,16 @@ const newCategoryName = ref('')
 const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
 
 const extractedUserId = computed(() => extractUserId(props.user))
+
+watch(extractedUserId, (next, prev) => {
+  if (next === prev) return
+  if (!next) {
+    allCategories.value = []
+    error.value = 'Sign in to load your categories.'
+    return
+  }
+  fetchCategories()
+})
 
 const fetchCategories = async () => {
   error.value = null
@@ -140,214 +150,380 @@ const saveEdit = async (c: any, idx: number) => {
 onMounted(() => {
   fetchCategories()
 })
+
 </script>
 
 <template>
-  <div class="categories-page">
-    <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
-    </div>
-
-    <div class="container">
-      <div class="header">
-        <h1>Categories</h1>
-        <button class="btn-refresh" @click="fetchCategories" :disabled="loading">
-          {{ loading ? 'Refreshing…' : '🔄 Refresh' }}
-        </button>
-      </div>
-
-      <div class="add-card">
-        <h3>Create New Category</h3>
-        <div class="add-row">
-          <input
-            v-model="newCategoryName"
-            type="text"
-            placeholder="Category name"
-            :disabled="adding"
-          />
-          <button class="btn-primary" @click="addCategory" :disabled="adding">
-            {{ adding ? 'Adding…' : 'Add Category' }}
+  <div class="categories-page ff-page">
+    <div class="ff-page-frame">
+      <header class="ff-page-header categories-header">
+        <div class="header-stack">
+          <button type="button" class="ff-back-button" @click="emit('navigate', 'main')">
+            <span class="ff-icon icon-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.5 4.5L7 10l5.5 5.5" />
+              </svg>
+            </span>
+            Back to Dashboard
+          </button>
+          <div class="heading-copy">
+            <h1>Categories</h1>
+            <p class="ff-page-subtitle">Create, rename, and review your category list to keep labeling fast and accurate.</p>
+          </div>
+        </div>
+        <div class="ff-header-actions">
+          <button type="button" class="header-refresh" @click="fetchCategories" :disabled="loading">
+            <span class="ff-icon icon-refresh" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 10a7 7 0 0 0-7-7 7 7 0 0 0-6.6 4.8" />
+                <path d="M6 4h-3V1" />
+                <path d="M3 10a7 7 0 0 0 7 7 7 7 0 0 0 6.6-4.8" />
+                <path d="M14 16h3v3" />
+              </svg>
+            </span>
+            <span>{{ loading ? 'Refreshing…' : 'Refresh' }}</span>
           </button>
         </div>
-        <div v-if="addError" class="error">❌ {{ addError }}</div>
-      </div>
+      </header>
 
-      <div class="list-card">
-        <h3>Your Categories</h3>
-        <div v-if="error" class="error">❌ {{ error }}</div>
-        <div v-else-if="loading" class="loading">Loading…</div>
-        <div v-else>
-          <div class="debug-info">
-            <small style="color: #999;">
-              Categories loaded: {{ allCategories.length }}
-            </small>
-          </div>
-          <div v-if="allCategories.length === 0" class="empty">
-            No categories yet.
-          </div>
-          <ul v-else class="category-list">
-            <li v-for="(c, idx) in allCategories" :key="c.category_id || c.name">
-              <span class="dot"></span>
-              <template v-if="editingIndex === idx">
-                <input v-model="editName" class="edit-input" />
-                <button class="btn-small" @click.prevent="saveEdit(c, idx)">Save</button>
-                <button class="btn-small muted" @click.prevent="cancelEdit(idx)">Cancel</button>
-                <div class="edit-status">{{ editStatus[idx] }}</div>
-              </template>
-              <template v-else>
-                <span class="name">{{ c.name }}</span>
-                <!-- owner_id hidden in UI for privacy -->
-                <button class="btn-small" @click.prevent="viewCategory(c)">View</button>
-                <button class="btn-small" @click.prevent="startEdit(c, idx)">Edit</button>
-              </template>
-            </li>
-          </ul>
+      <div class="ff-page-grid">
+        <div class="ff-column">
+          <section class="ff-card add-card">
+            <h2 class="ff-card-title">Create a category</h2>
+            <p class="ff-card-subtitle">Add new categories to streamline future labeling.</p>
+            <div class="add-row">
+              <input
+                v-model="newCategoryName"
+                type="text"
+                placeholder="Category name"
+                :disabled="adding"
+              />
+              <button class="action-button primary" type="button" @click="addCategory" :disabled="adding">
+                {{ adding ? 'Adding…' : 'Add Category' }}
+              </button>
+            </div>
+            <div v-if="addError" class="banner error">
+              <span class="ff-icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ addError }}
+            </div>
+          </section>
+
+          <section class="ff-card list-card">
+            <div class="list-header">
+              <h2 class="ff-card-title">Your categories</h2>
+              <span class="badge" v-if="!loading">{{ allCategories.length }}</span>
+            </div>
+            <div v-if="error" class="banner error">
+              <span class="ff-icon icon-error" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ error }}
+            </div>
+            <div v-else-if="loading" class="loading">Loading…</div>
+            <div v-else-if="allCategories.length === 0" class="empty">No categories yet — add your first above.</div>
+            <ul v-else class="category-list">
+              <li v-for="(c, idx) in allCategories" :key="c.category_id || c.name">
+                <span class="dot"></span>
+                <template v-if="editingIndex === idx">
+                  <input v-model="editName" class="edit-input" />
+                  <div class="row-actions">
+                    <button class="btn-small" @click.prevent="saveEdit(c, idx)">Save</button>
+                    <button class="btn-small muted" @click.prevent="cancelEdit(idx)">Cancel</button>
+                  </div>
+                  <div class="edit-status">{{ editStatus[idx] }}</div>
+                </template>
+                <template v-else>
+                  <span class="name">{{ c.name }}</span>
+                  <div class="row-actions">
+                    <button class="btn-small" @click.prevent="viewCategory(c)">View</button>
+                    <button class="btn-small" @click.prevent="startEdit(c, idx)">Edit</button>
+                  </div>
+                </template>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="ff-column">
+          <section class="ff-card compact summary-card">
+            <h3 class="summary-title">Quick summary</h3>
+            <ul class="notes-list">
+              <li>Total categories: <strong>{{ allCategories.length }}</strong></li>
+              <li v-if="adding">Adding a new category…</li>
+              <li v-else>Keep names short and specific for faster search during labeling.</li>
+            </ul>
+          </section>
+          <section class="ff-card compact summary-card">
+            <h3 class="summary-title">Next steps</h3>
+            <p class="ff-summary">Continue to the unlabeled queue once your categories match the accounts you track most often.</p>
+            <button type="button" class="inline-link" @click="emit('navigate', 'unlabeled')">Review unlabeled transactions</button>
+          </section>
         </div>
       </div>
-
-      <!-- Debug card removed: raw JSON / debug table intentionally hidden in production UI -->
     </div>
   </div>
 </template>
 
 <style scoped>
-.categories-page {
-  min-height: calc(100vh - 70px);
-  background: #f5f7fa;
-  padding: 2rem 1rem;
+.categories-header {
+  align-items: flex-start;
 }
 
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-}
-
-.btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
-
-.container {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.header {
+.header-stack {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
 
-h1 { margin: 0; color: #333; }
+.heading-copy h1 {
+  margin: 0;
+  color: var(--ff-primary);
+}
 
-.btn-refresh {
-  padding: 0.5rem 0.9rem;
-  background: #667eea;
-  color: white;
+.header-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
   border: none;
-  border-radius: 4px;
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.add-card, .list-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
+.header-refresh:hover,
+.header-refresh:focus-visible {
+  background: var(--ff-secondary-hover);
+  transform: translateY(-1px);
+  outline: none;
 }
 
-.add-card h3, .list-card h3 { margin: 0 0 1rem 0; color: #333; }
+.header-refresh:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.add-card {
+  display: grid;
+  gap: 1.25rem;
+}
 
 .add-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .add-row input {
   flex: 1;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-background);
+  color: var(--ff-text-base);
 }
 
-.btn-primary {
-  padding: 0.65rem 1rem;
-  background: #667eea;
-  color: white;
+.action-button {
+  border-radius: 999px;
   border: none;
-  border-radius: 4px;
+  padding: 0.75rem 1.6rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.loading { color: #666; }
-.empty { color: #888; }
-.error {
-  margin-top: 0.5rem;
-  color: #c33;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
+.action-button.primary {
+  background: var(--ff-primary);
+  color: var(--ff-surface);
 }
 
-.category-list { list-style: none; padding: 0; margin: 0; }
-.category-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; }
-.category-list li:last-child { border-bottom: none; }
-.dot { width: 8px; height: 8px; background: #667eea; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.name { color: #333; flex-grow: 1; }
-.owner-id { color: #999; font-size: 0.85em; }
-.owner-id code { background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 3px; }
-
-.btn-small {
-  margin-left: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-  background: #fff;
-  cursor: pointer;
-}
-.btn-small.muted { color: #666; }
-.edit-input { padding: 0.4rem 0.5rem; margin-right: 0.5rem; border-radius: 4px; border: 1px solid #ddd; }
-.edit-status { color: #666; font-size: 0.85rem; margin-top: 0.4rem; }
-
-.debug-card {
-  background: #fffbf0;
-  border: 2px dashed #f0ad4e;
+.action-button.primary:hover,
+.action-button.primary:focus-visible {
+  background: var(--ff-primary-hover);
+  transform: translateY(-1px);
+  outline: none;
 }
 
-.debug-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
 }
 
-.debug-table th {
-  text-align: left;
-  padding: 0.5rem;
-  background: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
+.banner.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
+}
+
+.list-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
+  padding: 0.25rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.loading {
+  color: var(--ff-text-base);
+}
+
+.empty {
+  color: var(--ff-text-muted);
+}
+
+.category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.category-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--ff-border);
+}
+
+.category-list li:last-child {
+  border-bottom: none;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ff-secondary);
+}
+
+.name {
+  color: var(--ff-text-base);
   font-weight: 600;
 }
 
-.debug-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid #f0f0f0;
+.row-actions {
+  display: inline-flex;
+  gap: 0.45rem;
 }
 
-.debug-table code {
-  background: #f5f5f5;
-  padding: 0.2rem 0.4rem;
-  border-radius: 3px;
-  font-size: 0.85em;
+.btn-small {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-small:hover,
+.btn-small:focus-visible {
+  background: var(--ff-primary-ghost);
+  outline: none;
+}
+
+.btn-small.muted {
+  color: var(--ff-text-muted);
+}
+
+.edit-input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--ff-primary-border-strong);
+  background: var(--ff-background);
+  color: var(--ff-text-base);
+}
+
+.edit-status {
+  color: var(--ff-text-subtle);
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.summary-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1.1rem;
+}
+
+.notes-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ff-text-muted);
+  line-height: 1.6;
+}
+
+.inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ff-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.2s ease;
+}
+
+.inline-link:hover,
+.inline-link:focus-visible {
+  color: var(--ff-secondary-hover);
+  outline: none;
+}
+
+@media (max-width: 720px) {
+  .add-row {
+    flex-direction: column;
+  }
+
+  .action-button.primary,
+  .add-row input {
+    width: 100%;
+  }
+
+  .row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

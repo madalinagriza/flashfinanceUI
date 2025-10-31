@@ -178,7 +178,15 @@ const handleChangePassword = async () => {
 <template>
   <div class="account-page" v-if="accountUser">
     <div class="topbar">
-      <button class="btn-back" @click="emit('navigate', 'main')">← Back to Home</button>
+      <button class="btn-back" @click="emit('navigate', 'main')">
+        <span class="icon icon-arrow" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.5 4.5L7 10l5.5 5.5" />
+            <path d="M7 10h7" />
+          </svg>
+        </span>
+        <span>Back to Home</span>
+      </button>
     </div>
 
     <div class="container">
@@ -209,8 +217,24 @@ const handleChangePassword = async () => {
           <h2>Deactivate Account</h2>
           <p>Deactivate to revoke access while preserving data.</p>
         </div>
-        <div v-if="deactivateState.error" class="alert error">❌ {{ deactivateState.error }}</div>
-        <div v-if="deactivateState.message" class="alert success">✅ {{ deactivateState.message }}</div>
+        <div v-if="deactivateState.error" class="alert error">
+          <span class="icon icon-error" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10" cy="10" r="8" />
+              <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+            </svg>
+          </span>
+          <span>{{ deactivateState.error }}</span>
+        </div>
+        <div v-if="deactivateState.message" class="alert success">
+          <span class="icon icon-check" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 11l3.5 3.5L15 8" />
+              <circle cx="10" cy="10" r="8" />
+            </svg>
+          </span>
+          <span>{{ deactivateState.message }}</span>
+        </div>
         <button
           class="btn-deactivate"
           @click="handleDeactivate"
@@ -225,8 +249,24 @@ const handleChangePassword = async () => {
           <h2>Change Password</h2>
           <p>Update the password using the current credential for verification.</p>
         </div>
-        <div v-if="passwordState.error" class="alert error">❌ {{ passwordState.error }}</div>
-        <div v-if="passwordState.message" class="alert success">✅ {{ passwordState.message }}</div>
+        <div v-if="passwordState.error" class="alert error">
+          <span class="icon icon-error" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10" cy="10" r="8" />
+              <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+            </svg>
+          </span>
+          <span>{{ passwordState.error }}</span>
+        </div>
+        <div v-if="passwordState.message" class="alert success">
+          <span class="icon icon-check" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 11l3.5 3.5L15 8" />
+              <circle cx="10" cy="10" r="8" />
+            </svg>
+          </span>
+          <span>{{ passwordState.message }}</span>
+        </div>
         <form class="password-form" @submit.prevent="handleChangePassword">
           <label class="form-field">
             <span>Current Password</span>
@@ -271,7 +311,25 @@ const handleChangePassword = async () => {
             <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
             <span>Suggest categories with AI</span>
           </label>
-          <div v-if="suggestPref.message" class="alert" :class="{ success: suggestPref.message.includes('enabled'), error: suggestPref.message.includes('Unable') }">{{ suggestPref.message }}</div>
+          <div
+            v-if="suggestPref.message"
+            class="alert"
+            :class="{ success: !suggestPref.message.includes('Unable'), error: suggestPref.message.includes('Unable') }"
+          >
+            <span v-if="suggestPref.message.includes('Unable')" class="icon icon-error" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="8" />
+                <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+              </svg>
+            </span>
+            <span v-else class="icon icon-check" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 11l3.5 3.5L15 8" />
+                <circle cx="10" cy="10" r="8" />
+              </svg>
+            </span>
+            <span>{{ suggestPref.message }}</span>
+          </div>
         </div>
       </section>
     </div>
@@ -285,7 +343,7 @@ const handleChangePassword = async () => {
 <style scoped>
 .account-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--ff-background);
   padding: 2rem 1rem 3rem 1rem;
 }
 
@@ -297,12 +355,20 @@ const handleChangePassword = async () => {
 }
 
 .btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  border: 1px solid var(--ff-primary-border-strong);
   border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.85rem;
   cursor: pointer;
+  transition: background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-back:hover {
+  background: var(--ff-primary-ghost);
 }
 
 .container {
@@ -325,12 +391,12 @@ const handleChangePassword = async () => {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.75rem;
-  color: #7c8594;
+  color: rgba(31, 41, 51, 0.56);
   margin-bottom: 0.25rem;
 }
 
 .description {
-  color: #6b7280;
+  color: rgba(31, 41, 51, 0.72);
   margin-top: 0.5rem;
 }
 
@@ -349,17 +415,17 @@ const handleChangePassword = async () => {
 }
 
 .status-badge.active {
-  background: #d4edda;
-  color: #155724;
+  background: var(--ff-success-soft);
+  color: var(--ff-success);
 }
 
 .status-badge.inactive {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--ff-error-soft);
+  color: var(--ff-error);
 }
 
 .card {
-  background: #fff;
+  background: var(--ff-surface);
   border-radius: 12px;
   padding: 1.75rem;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
@@ -370,12 +436,12 @@ const handleChangePassword = async () => {
 
 .card-header h2 {
   margin: 0;
-  color: #1f2937;
+  color: var(--ff-primary);
 }
 
 .card-header p {
   margin: 0.5rem 0 0 0;
-  color: #6b7280;
+  color: rgba(31, 41, 51, 0.72);
 }
 
 .profile-grid {
@@ -389,32 +455,40 @@ const handleChangePassword = async () => {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #9ca3af;
+  color: rgba(31, 41, 51, 0.56);
   margin-bottom: 0.4rem;
 }
 
 .value {
   font-size: 1rem;
-  color: #1f2937;
+  color: rgba(31, 41, 51, 0.88);
   word-break: break-all;
 }
 
 .alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.9rem;
 }
 
+.alert span:last-child {
+  flex: 1;
+  line-height: 1.4;
+}
+
 .alert.error {
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
 }
 
 .alert.success {
-  background: #dcfce7;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background: var(--ff-success-soft);
+  border: 1px solid var(--ff-success-border);
+  color: var(--ff-success);
 }
 
 .btn-deactivate {
@@ -422,11 +496,11 @@ const handleChangePassword = async () => {
   padding: 0.6rem 1.2rem;
   border: none;
   border-radius: 6px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--ff-error-soft);
+  color: var(--ff-error);
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .btn-deactivate:disabled {
@@ -436,7 +510,7 @@ const handleChangePassword = async () => {
 }
 
 .btn-deactivate:hover:not(:disabled) {
-  opacity: 0.9;
+  background: rgba(196, 76, 76, 0.26);
   transform: translateY(-1px);
 }
 
@@ -450,14 +524,15 @@ const handleChangePassword = async () => {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  color: #1f2937;
+  color: rgba(31, 41, 51, 0.78);
 }
 
 .form-field input {
   padding: 0.6rem;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--ff-primary-border-strong);
   font-size: 1rem;
+  background: var(--ff-surface);
 }
 
 .btn-primary {
@@ -465,15 +540,15 @@ const handleChangePassword = async () => {
   padding: 0.65rem 1.5rem;
   border: none;
   border-radius: 6px;
-  background: #4f46e5;
-  color: #fff;
+  background: var(--ff-primary);
+  color: var(--ff-surface);
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.95;
+  background: var(--ff-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -489,7 +564,32 @@ const handleChangePassword = async () => {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: #f5f7fa;
-  color: #374151;
+  background: var(--ff-background);
+  color: rgba(31, 41, 51, 0.78);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.icon-arrow {
+  color: var(--ff-primary);
+}
+
+.icon-error {
+  color: var(--ff-error);
+}
+
+.icon-check {
+  color: var(--ff-success);
 }
 </style>

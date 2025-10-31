@@ -1,89 +1,192 @@
 <template>
-  <div class="labeling-page">
-    <!-- Back button removed per request: single-forward flow only -->
-    <div class="container" v-if="currentTx">
-      <div class="header">
-        <h1>Label Transaction</h1>
-        <p>Categorize the spending below.</p>
-      </div>
-
-      <div class="transaction-card">
-        <div class="info-row">
-          <span class="label">Merchant:</span>
-          <span class="value merchant">{{ currentTx!.merchant_text }}</span>
+  <div class="labeling-page ff-page">
+    <div v-if="currentTx" class="ff-page-frame">
+      <header class="ff-page-header labeling-header">
+        <div class="header-main">
+          <h1>Label Transaction</h1>
+          <p class="ff-page-subtitle">Categorize the spending below.</p>
         </div>
-        <div class="info-row">
-          <span class="label">Date:</span>
-          <span class="value">{{ currentTx!.date }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">Amount:</span>
-          <span class="value amount">{{ formatCurrency(currentTx!.amount) }}</span>
-        </div>
-         <div class="info-row">
-          <span class="label">Transaction ID:</span>
-          <span class="value mono">{{ currentTx!.tx_id }}</span>
-        </div>
-      </div>
-
-      <div class="session-bar" v-if="sessionTransactions.length">
-        <div>
-          Session: {{ sessionIndex + 1 }} / {{ sessionTransactions.length }}
-        </div>
-        <div class="session-actions">
-          <button type="button" class="btn-next" @click="nextTx" :disabled="stageLoading || finalizeLoading">Next</button>
-        </div>
-      </div>
-
-      <div class="actions">
-        <h2>Select a Category</h2>
-        <button
-          v-if="!loading && !error && currentTx && userId"
-          class="btn-discard"
-          type="button"
-          @click="discardCurrentTx"
-          :disabled="stageLoading || finalizeLoading"
-        >
-          🗑️ Send to Trash
-        </button>
-        <div v-if="loading" class="loading-message">Loading categories...</div>
-        <div v-if="error" class="error-message">{{ error }}</div>
-        <div v-if="stageError" class="error-message">{{ stageError }}</div>
-        <div v-if="stageMessage" class="success-message">{{ stageMessage }}</div>
-        <div v-if="suggestLoading" class="loading-message">Getting suggestion…</div>
-        <div v-if="suggestError" class="error-message">⚠️ Suggestion failed: {{ suggestError }}</div>
-        <div v-if="!suggestLoading && visibleCategories.length > 0" class="category-list">
+        <div v-if="sessionTransactions.length" class="ff-header-actions session-controls">
+          <span class="session-progress">Session {{ sessionIndex + 1 }} / {{ sessionTransactions.length }}</span>
           <button
-            v-for="category in visibleCategories"
-            :key="category.category_id"
-            :class="['category-item', { 'category-suggested': category.category_id === suggestedCategoryId }]"
             type="button"
-            @click="stageCategory(category)"
-            :disabled="stageLoading"
+            class="header-next"
+            @click="nextTx"
+            :disabled="stageLoading || finalizeLoading"
           >
-            {{ category.name }}
+            Next
           </button>
         </div>
-        <div v-else-if="!loading && !error && !suggestLoading" class="no-data">
-          No categories found.
+      </header>
+
+      <div class="ff-page-grid">
+        <div class="ff-column">
+          <section class="ff-card tx-card">
+            <h2 class="ff-card-title">Transaction details</h2>
+            <div class="tx-grid">
+              <div class="tx-row">
+                <span class="tx-label">Merchant</span>
+                <span class="tx-value merchant">{{ currentTx!.merchant_text }}</span>
+              </div>
+              <div class="tx-row">
+                <span class="tx-label">Date</span>
+                <span class="tx-value">{{ currentTx!.date }}</span>
+              </div>
+              <div class="tx-row">
+                <span class="tx-label">Amount</span>
+                <span class="tx-value amount">{{ formatCurrency(currentTx!.amount) }}</span>
+              </div>
+              <div class="tx-row">
+                <span class="tx-label">Transaction ID</span>
+                <span class="tx-value mono">{{ currentTx!.tx_id }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="ff-card category-card">
+            <div class="category-header">
+              <h2 class="ff-card-title">Select a category</h2>
+              <button
+                v-if="!loading && !error && currentTx && userId"
+                type="button"
+                class="link-button danger"
+                @click="discardCurrentTx"
+                :disabled="stageLoading || finalizeLoading"
+              >
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 5h-12" />
+                    <path d="M7.5 3h5l.5 2h-6z" />
+                    <path d="M14 5v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5" />
+                  </svg>
+                </span>
+                Send to trash
+              </button>
+            </div>
+
+            <div v-if="loading" class="loading-message">Loading categories…</div>
+            <div v-if="error" class="banner error">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ error }}
+            </div>
+            <div v-if="stageError" class="banner error">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ stageError }}
+            </div>
+            <div v-if="stageMessage" class="banner success">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              {{ stageMessage }}
+            </div>
+            <div v-if="suggestLoading" class="loading-message">Getting suggestion…</div>
+            <div v-if="suggestError" class="banner warning">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 3.2l7.2 12.6a1 1 0 0 1-.87 1.5H3.67a1 1 0 0 1-.87-1.5L10 3.2z" />
+                  <path d="M10 8v3.8" />
+                  <path d="M10 14.8h.01" />
+                </svg>
+              </span>
+              Suggestion failed: {{ suggestError }}
+            </div>
+
+            <div v-if="!suggestLoading && visibleCategories.length > 0" class="category-grid">
+              <button
+                v-for="category in visibleCategories"
+                :key="category.category_id"
+                type="button"
+                class="category-chip"
+                :class="{ suggested: category.category_id === suggestedCategoryId }"
+                @click="stageCategory(category)"
+                :disabled="stageLoading"
+              >
+                {{ category.name }}
+              </button>
+            </div>
+            <div v-else-if="!loading && !error && !suggestLoading" class="no-data">No categories found.</div>
+          </section>
         </div>
 
-        <div class="finalize">
-          <button
-            class="btn-finalize"
-            type="button"
-            @click="finalizeLabeling"
-            :disabled="finalizeLoading || !userId"
-          >
-            {{ finalizeLoading ? 'Finalizing…' : '✅ Finalize Session' }}
-          </button>
-          <div v-if="finalizeError" class="error-message">{{ finalizeError }}</div>
-          <div v-if="finalizeMessage" class="success-message">{{ finalizeMessage }}</div>
+        <div class="ff-column">
+          <section v-if="sessionTransactions.length" class="ff-card compact session-card">
+            <h3 class="section-title">Session progress</h3>
+            <p class="ff-summary">Currently viewing transaction {{ sessionIndex + 1 }} of {{ sessionTransactions.length }}.</p>
+            <p class="ff-summary">Labeled this session: <strong>{{ sessionStagedTxIds.size }}</strong></p>
+          </section>
+
+          <section class="ff-card compact finalize-card">
+            <h3 class="section-title">Finalize session</h3>
+            <p class="ff-summary">Finalize once you have labeled every transaction in the queue.</p>
+            <button
+              class="action-button primary"
+              type="button"
+              @click="finalizeLabeling"
+              :disabled="finalizeLoading || !userId"
+            >
+              <template v-if="finalizeLoading">Finalizing…</template>
+              <template v-else>
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 11l3.5 3.5L15 8" />
+                    <circle cx="10" cy="10" r="8" />
+                  </svg>
+                </span>
+                Finalize session
+              </template>
+            </button>
+            <div v-if="finalizeError" class="banner error">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="10" r="8" />
+                  <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                </svg>
+              </span>
+              {{ finalizeError }}
+            </div>
+            <div v-if="finalizeMessage" class="banner success">
+              <span class="ff-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 11l3.5 3.5L15 8" />
+                  <circle cx="10" cy="10" r="8" />
+                </svg>
+              </span>
+              {{ finalizeMessage }}
+            </div>
+          </section>
+
+          <section class="ff-card compact tips-card">
+            <h3 class="section-title">Labeling tips</h3>
+            <ul class="tips-list">
+              <li>Suggested categories are highlighted for quick selection.</li>
+              <li>Use the “Next” control to move through the session without leaving the page.</li>
+              <li>Finalize after confirming every transaction has been categorized.</li>
+            </ul>
+          </section>
         </div>
       </div>
     </div>
-  <div v-else class="container">
+
+    <div v-else class="ff-page-frame">
+      <section class="ff-card empty-state">
         <p>No transaction selected for labeling.</p>
+        <button type="button" class="action-button secondary" @click="emit('navigate', 'unlabeled')">
+          Return to queue
+        </button>
+      </section>
     </div>
   </div>
 </template>
@@ -563,258 +666,342 @@ const skipTx = () => {
 </script>
 
 <style scoped>
-.labeling-page {
-  min-height: calc(100vh - 70px);
-  background: #f5f7fa;
-  padding: 2rem 1rem;
+.labeling-header {
+  align-items: flex-start;
 }
 
-.topbar {
-  position: sticky;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
+.header-main h1 {
+  margin: 0;
+  color: var(--ff-primary);
 }
 
-.btn-back {
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+.session-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.session-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header-next {
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.3rem;
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.container {
-  max-width: 700px;
-  margin: 0 auto;
+.header-next:hover,
+.header-next:focus-visible {
+  background: var(--ff-secondary-hover);
+  transform: translateY(-1px);
+  outline: none;
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 2rem;
+.header-next:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-h1 {
-  font-size: 2rem;
-  color: #333;
+.tx-card {
+  display: grid;
+  gap: 1.25rem;
 }
 
-.header p {
-  color: #666;
-  font-size: 1.1rem;
+.tx-grid {
+  display: grid;
+  gap: 0.85rem;
 }
 
-.transaction-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  margin-bottom: 2rem;
-}
-
-.info-row {
+.tx-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  align-items: flex-start;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--ff-border);
 }
 
-.info-row:last-child {
+.tx-row:last-child {
   border-bottom: none;
 }
 
-.label {
+.tx-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ff-text-subtle);
+}
+
+.tx-value {
+  color: var(--ff-text-base);
   font-weight: 600;
-  color: #555;
 }
 
-.value {
-  color: #333;
-}
-
-.merchant {
-  font-weight: bold;
+.tx-value.merchant {
+  color: var(--ff-primary);
   font-size: 1.1rem;
 }
 
-.amount {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #667eea;
+.tx-value.amount {
+  color: var(--ff-secondary);
+  font-size: 1.15rem;
 }
 
-.mono {
+.tx-value.mono {
   font-family: monospace;
   font-size: 0.9rem;
-  background: #eee;
+  background: var(--ff-overlay);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
 }
 
-.actions {
-  background: #fff;
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  text-align: center;
+.category-card {
+  display: grid;
+  gap: 1rem;
 }
 
-.btn-discard {
-  align-self: flex-start;
-  background: #ffe6e6;
-  color: #b22222;
-  border: 1px solid #f5c2c2;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+.category-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.link-button {
+  border-radius: 999px;
+  border: 1px solid var(--ff-border);
+  background: var(--ff-surface);
+  color: var(--ff-primary);
+  padding: 0.45rem 1rem;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.btn-discard:hover:enabled {
-  background: #ffcccc;
+.link-button:hover,
+.link-button:focus-visible {
+  background: var(--ff-primary-ghost);
+  border-color: var(--ff-primary-border-strong);
+  outline: none;
 }
 
-.btn-discard:disabled {
+.link-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.session-bar {
+.link-button.danger {
+  border-color: var(--ff-error-border);
+  background: var(--ff-error-soft);
+  color: var(--ff-error);
+}
+
+.link-button.danger:hover,
+.link-button.danger:focus-visible {
+  background: rgba(196, 76, 76, 0.24);
+}
+
+.loading-message {
+  color: var(--ff-text-muted);
+  font-size: 0.95rem;
+}
+
+.banner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin: 0 0 1rem 0;
-  padding: 0.75rem 1rem;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-.session-actions { display: flex; gap: 0.5rem; }
-.btn-skip, .btn-next {
-  padding: 0.4rem 0.8rem;
-  background: #edf2f7;
-  color: #2d3748;
-  border: 1px solid #cbd5e0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.btn-next { background: #e6fffa; border-color: #b2f5ea; color: #234e52; }
-
-.actions h2 {
-  margin-bottom: 1.5rem;
-  color: #333;
+  gap: 0.6rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
 }
 
-.loading-message, .error-message, .success-message, .no-data {
-  padding: 1rem;
-  color: #666;
+.banner.error {
+  background: var(--ff-error-soft);
+  border: 1px solid var(--ff-error-border);
+  color: var(--ff-error);
 }
 
-.error-message {
-  color: #e53e3e;
-  background-color: #fff5f5;
-  border: 1px solid #e53e3e;
-  border-radius: 6px;
+.banner.success {
+  background: var(--ff-success-soft);
+  border: 1px solid var(--ff-success-border);
+  color: var(--ff-success);
 }
 
-.success-message {
-  color: #276749;
-  background-color: #f0fff4;
-  border: 1px solid #68d391;
-  border-radius: 6px;
+.banner.warning {
+  background: rgba(231, 183, 91, 0.18);
+  border: 1px solid rgba(231, 183, 91, 0.32);
+  color: #8a6728;
 }
 
-.category-list {
+.category-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
+  gap: 0.6rem;
 }
 
-.category-item {
-  background-color: #f0f4ff;
-  color: #5a67d8;
-  padding: 0.75rem 1.25rem;
-  border-radius: 20px;
-  font-weight: 500;
+.category-chip {
+  border-radius: 999px;
+  border: 1px solid var(--ff-primary-border-strong);
+  padding: 0.55rem 1.15rem;
+  background: var(--ff-primary-ghost);
+  color: var(--ff-primary);
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #c3dafe;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.category-chip:hover,
+.category-chip:focus-visible {
+  background: rgba(61, 122, 116, 0.24);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.category-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.category-chip.suggested {
+  background: rgba(231, 183, 91, 0.22);
+  border-color: rgba(231, 183, 91, 0.42);
+  color: #8a6728;
+}
+
+.no-data {
+  color: var(--ff-text-muted);
+  font-size: 0.95rem;
+}
+
+.session-card,
+.finalize-card,
+.tips-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.section-title {
+  margin: 0;
+  color: var(--ff-primary);
+  font-size: 1.05rem;
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ff-text-muted);
+  line-height: 1.6;
+}
+
+.action-button {
+  border-radius: 999px;
+  border: none;
+  padding: 0.7rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-style: solid;
-  background-clip: padding-box;
-}
-
-.category-item:hover {
-  background-color: #e2e8f0;
-  color: #4c51bf;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.category-item:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-  transform: none;
-  box-shadow: none;
-}
-
-.category-suggested {
-  background-color: #fef3c7 !important;
-  border: 2px solid #f59e0b !important;
-  color: #92400e !important;
-  font-weight: 600;
-  position: relative;
-}
-
-.category-suggested:hover {
-  background-color: #fde68a !important;
-  color: #78350f !important;
-}
-
-.suggest-badge {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
-}
-
-.finalize {
-  margin-top: 1.25rem;
-  display: grid;
   gap: 0.5rem;
-  justify-items: center;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.btn-finalize {
-  padding: 0.6rem 1.1rem;
-  background: #2f855a;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
+.action-button.primary {
+  background: var(--ff-primary);
+  color: var(--ff-surface);
 }
 
-.btn-finalize:disabled {
-  opacity: 0.7;
+.action-button.primary:hover:not(:disabled),
+.action-button.primary:focus-visible:not(:disabled) {
+  background: var(--ff-primary-hover);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.action-button.secondary {
+  background: var(--ff-secondary);
+  color: var(--ff-surface);
+}
+
+.action-button.secondary:hover,
+.action-button.secondary:focus-visible {
+  background: var(--ff-secondary-hover);
+  outline: none;
+}
+
+.action-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
-.debug-box {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  text-align: left;
-  background: #f8fafc;
-  border: 1px dashed #a0aec0;
-  border-radius: 6px;
-  font-family: monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  word-break: break-word;
+.empty-state {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.ff-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+}
+
+.ff-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .session-controls {
+    align-self: stretch;
+  }
+
+  .header-next {
+    width: 100%;
+  }
+
+  .category-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .link-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .category-grid {
+    justify-content: flex-start;
+  }
+
+  .action-button {
+    width: 100%;
+  }
 }
 </style>
