@@ -16,6 +16,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref(false)
 const registeredUser = ref<User | null>(null)
+const lastRegisteredUserId = ref<string | null>(null)
 
 const resetForm = () => {
   email.value = ''
@@ -54,7 +55,8 @@ const handleRegister = async () => {
       password: password.value,
     })
 
-    registeredUser.value = user
+  registeredUser.value = user
+  lastRegisteredUserId.value = user?.user_id ?? null
     success.value = true
     resetForm()
     
@@ -146,7 +148,7 @@ const handleRegister = async () => {
           </span>
           <span>
             Registration successful! Welcome, {{ registeredUser?.name }}!
-            <small>User ID: {{ registeredUser?.user_id }}</small>
+            <small v-if="lastRegisteredUserId" class="sr-only">New user id: {{ lastRegisteredUserId }}</small>
           </span>
         </div>
 
@@ -325,5 +327,17 @@ input:disabled {
 
 .icon-check {
   color: var(--ff-success);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

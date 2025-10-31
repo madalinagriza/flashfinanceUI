@@ -38,6 +38,12 @@ const metricsState = reactive<
 const metricsRaw = ref('')
 const metricsFilterError = ref<string | null>(null)
 
+const markMetricsDisabled = () => {
+  metricsState.status = 'idle'
+  metricsFilterError.value = null
+  metricsRaw.value = 'Metrics disabled for Trash category.'
+}
+
 const DEFAULT_METRICS_END = '2025-10-30'
 const DEFAULT_METRICS_START = '2024-10-30'
 
@@ -78,9 +84,17 @@ const deleteState = reactive({
   message: null as string | null,
 })
 
+const categoryDeleteState = reactive({
+  loading: false,
+  error: null as string | null,
+  message: null as string | null,
+})
+
 const ownerId = computed(() => normalizeId(props.category?.owner_id ?? props.user?.user_id) ?? null)
 const categoryId = computed(() => normalizeId(props.category?.category_id) ?? null)
-const categoryName = computed(() => props.category?.name ?? 'Unknown category')
+const rawCategoryName = computed(() => props.category?.name ?? '')
+const categoryName = computed(() => rawCategoryName.value || 'Unknown category')
+const isTrashCategory = computed(() => rawCategoryName.value.trim().toLowerCase() === 'trash')
 const moveTargets = computed(() =>
   allCategories.value.filter(cat => cat.category_id !== categoryId.value)
 )
@@ -169,6 +183,10 @@ const loadTransactions = async () => {
 }
 
 const loadMetrics = async () => {
+  if (isTrashCategory.value) {
+    markMetricsDisabled()
+    return
+  }
   if (!ownerId.value || !categoryId.value) {
     metricsState.status = 'error'
     ;(metricsState as any).error = 'Missing owner or category id.'
@@ -228,6 +246,10 @@ const loadMetrics = async () => {
 }
 
 const applyMetricsFilters = async () => {
+  if (isTrashCategory.value) {
+    markMetricsDisabled()
+    return
+  }
   await loadMetrics()
 }
 
@@ -380,6 +402,57 @@ const deleteTransaction = async (txId: string) => {
   }
 }
 
+const deleteCategory = async () => {
+  if (!ownerId.value || !categoryId.value) {
+    categoryDeleteState.error = 'Missing owner or category context.'
+    return
+  }
+
+  categoryDeleteState.error = null
+  categoryDeleteState.message = null
+
+  if (transactionsState.status === 'loading') {
+    categoryDeleteState.error = 'Wait for transactions to finish loading before deleting.'
+    return
+  }
+
+  categoryDeleteState.loading = true
+  try {
+    const transactions = await categoryApi.listTransactions({
+      owner_id: ownerId.value,
+      category_id: categoryId.value,
+    })
+
+    if (Array.isArray(transactions) && transactions.length > 0) {
+      categoryDeleteState.error = 'This category must have no transactions to be deleted.'
+      return
+    }
+
+    const confirmed = window.confirm('Delete this category? This action cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
+    await categoryApi.delete({
+      owner_id: ownerId.value,
+      category_id: categoryId.value,
+      can_delete: true,
+    })
+
+    categoryDeleteState.message = 'Category deleted.'
+
+    setTimeout(() => {
+      categoryDeleteState.message = null
+      emit('navigate', 'categories')
+    }, 1200)
+  } catch (error: any) {
+    console.error('CategoryDetail: failed to delete category', error)
+    categoryDeleteState.error = error?.message ?? 'Failed to delete category.'
+  } finally {
+    categoryDeleteState.loading = false
+  }
+}
+
 const formatDate = (iso: string) => {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString()
@@ -393,7 +466,11 @@ onMounted(async () => {
   initializeMetricsPeriod()
   await fetchCategories()
   await loadTransactions()
-  await loadMetrics()
+  if (isTrashCategory.value) {
+    markMetricsDisabled()
+  } else {
+    await loadMetrics()
+  }
 })
 
 watch(
@@ -410,7 +487,13 @@ watch(
     if (!newOwner || !newCategory) return
     if (newOwner !== oldOwner || newCategory !== oldCategory) {
       loadTransactions()
-      loadMetrics()
+      if (isTrashCategory.value) {
+        markMetricsDisabled()
+      } else {
+        loadMetrics()
+      }
+      categoryDeleteState.error = null
+      categoryDeleteState.message = null
     }
   }
 )
@@ -427,6 +510,19 @@ watch(
     }
     if (!newTargets.some(cat => cat.category_id === moveState.targetCategoryId)) {
       moveState.targetCategoryId = newTargets[0]?.category_id ?? null
+    }
+  }
+)
+
+watch(
+  isTrashCategory,
+  (isTrash) => {
+    if (isTrash) {
+      markMetricsDisabled()
+      return
+    }
+    if (ownerId.value && categoryId.value) {
+      loadMetrics()
     }
   }
 )
@@ -472,19 +568,33 @@ const goBack = () => {
         <div v-if="categoriesError" class="notice notice-error">
           {{ categoriesError }}
         </div>
+        <div v-if="categoryDeleteState.message" class="notice notice-success">
+          {{ categoryDeleteState.message }}
+        </div>
+        <div v-if="categoryDeleteState.error" class="notice notice-error">
+          {{ categoryDeleteState.error }}
+        </div>
 
         <header class="header">
           <div>
             <h1>{{ categoryName }}</h1>
             <!-- Category ID removed from UI (kept internally) -->
           </div>
+          <button
+            type="button"
+            class="btn-delete-category"
+            @click="deleteCategory"
+            :disabled="categoryDeleteState.loading"
+          >
+            {{ categoryDeleteState.loading ? 'Deleting…' : 'Delete Category' }}
+          </button>
         </header>
 
-        <section class="metrics">
+        <section v-if="!isTrashCategory" class="metrics">
           <div class="metrics-header">
             <div>
               <h3>Category Metrics</h3>
-              <p class="subtitle">Select a custom period to recalculate totals.</p>
+              <p class="subtitle">Select a date range to recalculate statistics.</p>
             </div>
             <form class="metrics-filter" @submit.prevent="applyMetricsFilters">
               <label>
@@ -687,6 +797,32 @@ const goBack = () => {
   gap: 1rem;
 }
 
+.btn-delete-category {
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--ff-error-border);
+  background: var(--ff-error-soft);
+  color: var(--ff-error);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-delete-category:hover,
+.btn-delete-category:focus-visible {
+  background: color-mix(in srgb, var(--ff-error) 18%, var(--ff-error-soft));
+  border-color: var(--ff-error);
+  color: var(--ff-error);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.btn-delete-category:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .subtitle {
   margin-top: 0.5rem;
   color: var(--ff-text-muted);
@@ -714,6 +850,20 @@ const goBack = () => {
   border-radius: 10px;
   padding: 1.25rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.metrics.metrics-disabled {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.metrics.metrics-disabled .metrics-header {
+  margin-bottom: 0;
+}
+
+.metrics-disabled-copy {
+  color: var(--ff-text-muted);
+  font-size: 0.95rem;
 }
 
 .metrics-header {

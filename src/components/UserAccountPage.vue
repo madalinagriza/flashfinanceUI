@@ -213,36 +213,34 @@ const handleChangePassword = async () => {
 
           <div class="account-divider"></div>
 
-          <div class="account-section deactivate-section">
+          <div class="account-section preference-section">
             <div class="section-heading">
-              <h2 class="section-title">Deactivate Account</h2>
-              <p class="section-copy">Deactivate to revoke access while preserving data.</p>
+              <h2 class="section-title">Preferences</h2>
+              <p class="section-copy">Control labeling suggestions powered by AI.</p>
             </div>
-            <div v-if="deactivateState.error" class="alert error">
-              <span class="icon icon-error" aria-hidden="true">
+            <label class="toggle-field">
+              <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
+              <span>Suggest categories with AI</span>
+            </label>
+            <div
+              v-if="suggestPref.message"
+              class="alert"
+              :class="{ success: !suggestPref.message.includes('Unable'), error: suggestPref.message.includes('Unable') }"
+            >
+              <span v-if="suggestPref.message.includes('Unable')" class="icon icon-error" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="10" cy="10" r="8" />
                   <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
                 </svg>
               </span>
-              <span>{{ deactivateState.error }}</span>
-            </div>
-            <div v-if="deactivateState.message" class="alert success">
-              <span class="icon icon-check" aria-hidden="true">
+              <span v-else class="icon icon-check" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M5 11l3.5 3.5L15 8" />
                   <circle cx="10" cy="10" r="8" />
                 </svg>
               </span>
-              <span>{{ deactivateState.message }}</span>
+              <span>{{ suggestPref.message }}</span>
             </div>
-            <button
-              class="btn-deactivate"
-              @click="handleDeactivate"
-              :disabled="!canDeactivate"
-            >
-              {{ deactivateState.loading ? 'Deactivating...' : 'Deactivate Account' }}
-            </button>
           </div>
 
           <div class="account-divider"></div>
@@ -308,34 +306,38 @@ const handleChangePassword = async () => {
 
           <div class="account-divider"></div>
 
-          <div class="account-section preference-section">
+          <div class="account-section deactivate-section">
             <div class="section-heading">
-              <h2 class="section-title">Preferences</h2>
-              <p class="section-copy">Control labeling suggestions powered by AI.</p>
+              <h2 class="section-title">Deactivate Account</h2>
+              <p class="section-copy">Deactivate to revoke access while preserving data.</p>
+              <p class="section-copy">To reactivate, contact administrator.</p>
+
             </div>
-            <label class="toggle-field">
-              <input type="checkbox" v-model="suggestPref.enabled" @change="toggleSuggestPref" />
-              <span>Suggest categories with AI</span>
-            </label>
-            <div
-              v-if="suggestPref.message"
-              class="alert"
-              :class="{ success: !suggestPref.message.includes('Unable'), error: suggestPref.message.includes('Unable') }"
-            >
-              <span v-if="suggestPref.message.includes('Unable')" class="icon icon-error" aria-hidden="true">
+            <div v-if="deactivateState.error" class="alert error">
+              <span class="icon icon-error" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="10" cy="10" r="8" />
                   <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
                 </svg>
               </span>
-              <span v-else class="icon icon-check" aria-hidden="true">
+              <span>{{ deactivateState.error }}</span>
+            </div>
+            <div v-if="deactivateState.message" class="alert success">
+              <span class="icon icon-check" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M5 11l3.5 3.5L15 8" />
                   <circle cx="10" cy="10" r="8" />
                 </svg>
               </span>
-              <span>{{ suggestPref.message }}</span>
+              <span>{{ deactivateState.message }}</span>
             </div>
+            <button
+              class="btn-deactivate"
+              @click="handleDeactivate"
+              :disabled="!canDeactivate"
+            >
+              {{ deactivateState.loading ? 'Deactivating...' : 'Deactivate Account' }}
+            </button>
           </div>
         </section>
       </div>

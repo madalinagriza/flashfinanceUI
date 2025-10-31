@@ -1,5 +1,5 @@
 :root {
-  --ff-app-bar-height: 44px;
+  --ff-app-bar-height: 58px;
   --ff-page-max-width: 1180px;
   --ff-page-padding-x: clamp(1rem, 4vw, 2.25rem);
   --ff-page-padding-y: clamp(1.5rem, 3.5vw, 3rem);

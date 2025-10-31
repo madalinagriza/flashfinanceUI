@@ -179,7 +179,6 @@ const handleFileChange = async (event: Event) => {
           <section class="ff-card compact status-card" v-if="csvContent">
             <h3 class="notes-title">Import summary</h3>
             <p class="ff-summary">Current paste length: {{ csvContent.length.toLocaleString() }} characters.</p>
-            <p class="ff-summary">Remember to remove column headers if your file contains duplicates.</p>
           </section>
         </div>
 

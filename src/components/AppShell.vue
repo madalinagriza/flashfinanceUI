@@ -69,6 +69,7 @@ const handleBrandClick = () => {
   display: flex;
   align-items: center;
   gap: 20px;
+  min-height: var(--ff-app-bar-height);
   padding: 0 22px;
 }
 

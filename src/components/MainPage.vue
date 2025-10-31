@@ -29,10 +29,22 @@ const userId = computed(() => extractUserId(props.user))
 
 const importStorageKey = computed(() => (userId.value ? `ff:last-import:${userId.value}` : null))
 
-const categoryPreview = computed(() => categories.value.slice(0, 4))
+const CATEGORY_PREVIEW_LIMIT = 6
+
+const categoryPreview = computed(() => categories.value)
+const limitedCategoryPreview = computed(() => categoryPreview.value.slice(0, CATEGORY_PREVIEW_LIMIT))
+const hasMoreCategories = computed(() => categoryPreview.value.length > CATEGORY_PREVIEW_LIMIT)
+const remainingCategoryCount = computed(() => Math.max(categoryPreview.value.length - CATEGORY_PREVIEW_LIMIT, 0))
 
 const unlabeledCount = computed(() => unlabeledTransactions.value.length)
 const unlabeledPreview = computed(() => unlabeledTransactions.value.slice(0, 3))
+
+const getCategoryInitial = (name: string | null | undefined) => {
+  if (typeof name !== 'string') return '#'
+  const trimmed = name.trim()
+  if (!trimmed) return '#'
+  return trimmed.charAt(0).toUpperCase()
+}
 
 const formatCurrency = (value: number | null | undefined) => {
   if (typeof value !== 'number' || Number.isNaN(value)) return '--'
@@ -165,13 +177,13 @@ onBeforeUnmount(() => {
   <div class="main-page ff-page">
     <div class="ff-page-frame">
       <header class="ff-page-header main-header">
-        <div class="ff-page-heading">
+        <div class="main-hero">
           <p class="eyebrow">Dashboard</p>
-          <h1>Focus your next step</h1>
-          <p class="ff-page-subtitle">
-            Each section below highlights recent activity so you can jump straight into managing finances.
-          </p>
-          <p v-if="user" class="greeting">Signed in as <strong>{{ user.name }}</strong></p>
+          <div class="hero-row">
+            <h1 class="hero-title">Take charge of your spendings</h1>
+            <p v-if="user" class="hero-greeting">Welcome back, {{ user.name.split(' ')[0] }}!</p>
+            <p v-else class="hero-greeting">Welcome to FlashFinance!</p>
+          </div>
         </div>
       </header>
 
@@ -180,7 +192,7 @@ onBeforeUnmount(() => {
           <div class="feature-header">
             <div>
               <h2 class="feature-title">Categories</h2>
-              <p class="feature-subtitle">Keep labels sharp for faster insights.</p>
+              <p class="feature-subtitle">Better categories, clearer trends.</p>
             </div>
             <span v-if="categories.length" class="feature-pill">{{ categories.length }} total</span>
           </div>
@@ -189,15 +201,32 @@ onBeforeUnmount(() => {
             <p v-else-if="categoriesLoading" class="feature-copy">Loading categories…</p>
             <p v-else-if="categoriesError" class="feature-copy error">{{ categoriesError }}</p>
             <template v-else>
-              <ul v-if="categoryPreview.length" class="preview-chips">
-                <li v-for="cat in categoryPreview" :key="cat.category_id" class="preview-chip">{{ cat.name }}</li>
-              </ul>
+              <div v-if="categoryPreview.length" class="category-preview">
+                <ul class="category-grid">
+                  <li v-for="cat in limitedCategoryPreview" :key="cat.category_id" class="category-tile">
+                    <span class="category-initial" aria-hidden="true">{{ getCategoryInitial(cat.name) }}</span>
+                    <div class="category-text">
+                      <span class="category-name">{{ cat.name }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
               <p v-else class="feature-copy muted">No categories yet — create your first to organize spending.</p>
             </template>
           </div>
-          <button type="button" class="feature-action" @click="emit('navigate', 'categories')">
-            Manage Categories
-          </button>
+          <div class="category-footer">
+            <button type="button" class="feature-action" @click="emit('navigate', 'categories')">
+              Manage Categories
+            </button>
+            <button
+              v-if="hasMoreCategories"
+              type="button"
+              class="category-see-more"
+              @click="emit('navigate', 'categories')"
+            >
+              See {{ remainingCategoryCount }} more
+            </button>
+          </div>
         </section>
 
         <section class="ff-card feature-card unlabeled-card">
@@ -302,9 +331,37 @@ onBeforeUnmount(() => {
   color: var(--ff-text-subtle);
 }
 
-.greeting {
+.main-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.main-hero {
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.hero-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hero-title {
+  margin: 0;
+  color: var(--ff-primary);
+  flex: 1 1 auto;
+}
+
+.hero-greeting {
+  margin: 0 0 0 auto;
   color: var(--ff-secondary);
   font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .feature-grid {
@@ -395,25 +452,113 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
 }
 
-.preview-chips {
+.category-preview {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.category-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-.preview-chip {
-  display: inline-flex;
+.category-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #f5f7f6 0%, #eff3f1 100%);
+  border: 1px solid #e1e7e4;
+  box-shadow: 0 1px 2px rgba(68, 102, 96, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-tile:hover,
+.category-tile:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(68, 102, 96, 0.12);
+}
+
+.category-initial {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.35rem 0.9rem;
-  border-radius: 999px;
-  background: var(--ff-primary-ghost);
-  color: var(--ff-primary);
+  background: #d9e4df;
+  color: #36574f;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.category-text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.category-name {
   font-weight: 600;
-  font-size: 0.85rem;
+  color: #2f4b45;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.category-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ff-text-muted);
+}
+
+.category-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.category-footer .feature-action {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.category-see-more {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ff-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  transition: color 0.2s ease;
+}
+
+.category-see-more::after {
+  content: '›';
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.category-see-more:hover,
+.category-see-more:focus-visible {
+  color: var(--ff-secondary-hover);
+  outline: none;
 }
 
 .preview-list {
@@ -499,8 +644,23 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .hero-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .hero-greeting {
+    margin: 0;
+    white-space: normal;
+  }
+
   .feature-grid {
     row-gap: 2rem;
+  }
+
+  .category-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .feature-action {

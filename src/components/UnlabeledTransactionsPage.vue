@@ -101,7 +101,6 @@ onMounted(fetchUnlabeledTransactions)
           </button>
           <div class="heading-copy">
             <h1>Unlabeled Transactions</h1>
-            <p class="ff-page-subtitle">Review new activity and launch a labeling session to keep categories fresh.</p>
           </div>
         </div>
       </header>
@@ -112,8 +111,7 @@ onMounted(fetchUnlabeledTransactions)
             <h3 class="support-title">Queue tips</h3>
             <ul class="tips-list">
               <li>Label a handful of transactions at a time to keep momentum.</li>
-              <li>Use shortcuts inside the labeling screen to move faster.</li>
-              <li>Refresh the queue after importing new transactions.</li>
+              <li>For faster labeling, turn off suggestion more in the account page.</li>
             </ul>
           </section>
           <section class="ff-card compact glance-card" v-if="displayedTransactions.length">
@@ -166,12 +164,12 @@ onMounted(fetchUnlabeledTransactions)
           </div>
           <div v-else-if="displayedTransactions.length === 0" class="empty-message">
             <span class="ff-icon icon-check" aria-hidden="true">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 11l3.5 3.5L15 8" />
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 10l3.5 3.5L15 7" />
                 <circle cx="10" cy="10" r="8" />
               </svg>
             </span>
-            All transactions are labeled!
+            <p class="empty-message-text">All transactions are labeled!</p>
           </div>
           <div v-else class="table-wrapper">
             <table class="tx-table">
@@ -281,6 +279,10 @@ onMounted(fetchUnlabeledTransactions)
 
 .queue-cta {
   white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  box-shadow: 0 2px 6px rgba(31, 45, 54, 0.16);
 }
 
 .banner {
@@ -310,14 +312,27 @@ onMounted(fetchUnlabeledTransactions)
 }
 
 .empty-message {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--ff-primary-ghost);
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 3rem 1.5rem;
+  border-radius: 16px;
+  background: linear-gradient(145deg, var(--ff-primary-ghost) 0%, #fdfdfc 100%);
+  text-align: center;
+}
+
+.empty-message .ff-icon {
+  width: 4.5rem;
+  height: 4.5rem;
   color: var(--ff-primary);
-  border-radius: 999px;
-  padding: 0.5rem 1rem;
+}
+
+.empty-message-text {
+  font-size: 1.1rem;
   font-weight: 600;
+  color: var(--ff-primary);
 }
 
 .table-wrapper {
