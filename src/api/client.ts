@@ -2,9 +2,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 
 // Use Vue CLI env var if provided, otherwise default to dev proxy path '/api'
-const API_BASE_URL = (process.env.VUE_APP_API_BASE as string | undefined) || '/api'
-// TO DO LATER
-// const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+// const API_BASE_URL = (process.env.VUE_APP_API_BASE as string | undefined) || '/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 export class ApiClient {
   private client: AxiosInstance
 

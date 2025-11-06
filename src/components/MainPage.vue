@@ -181,7 +181,7 @@ onBeforeUnmount(() => {
           <p class="eyebrow">Dashboard</p>
           <div class="hero-row">
             <h1 class="hero-title">Take charge of your spendings</h1>
-            <p v-if="user" class="hero-greeting">Welcome back, {{ user.name.split(' ')[0] }}!</p>
+            <p v-if="user" class="hero-greeting">Welcome back, {{ user.username }}!</p>
             <p v-else class="hero-greeting">Welcome to FlashFinance!</p>
           </div>
         </div>
@@ -288,14 +288,20 @@ onBeforeUnmount(() => {
               <h2 class="feature-title">Account</h2>
               <p class="feature-subtitle">Manage your profile and preferences.</p>
             </div>
-            <span v-if="user?.status" class="feature-pill" :class="user.status.toLowerCase()">{{ user.status }}</span>
+            <span
+              v-if="user"
+              class="feature-pill"
+              :class="(user.status ?? 'ACTIVE').toLowerCase()"
+            >
+              {{ user.status ?? 'ACTIVE' }}
+            </span>
           </div>
           <div class="feature-body">
             <template v-if="user">
               <dl class="account-summary">
                 <div>
-                  <dt>Email</dt>
-                  <dd>{{ user.email }}</dd>
+                  <dt>Username</dt>
+                  <dd>{{ user.username }}</dd>
                 </div>
               </dl>
             </template>

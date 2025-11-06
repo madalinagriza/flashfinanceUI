@@ -14,7 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const accountUser = ref<User | null>(null)
-const deactivateState = reactive({ loading: false, message: null as string | null, error: null as string | null })
+// const deactivateState = reactive({ loading: false, message: null as string | null, error: null as string | null })
 const passwordState = reactive({ loading: false, message: null as string | null, error: null as string | null })
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 // Suggestion preference (persisted locally per-user)
@@ -32,10 +32,15 @@ watch(
     }
 
     accountUser.value = newUser
-      ? { ...newUser, user_id: normalizeUserId((newUser as any).user_id) }
+      ? {
+          ...newUser,
+          user_id: normalizeUserId((newUser as any).user_id),
+          username: (newUser as any).username ?? 'user',
+          status: (newUser as any).status ?? 'ACTIVE',
+        }
       : null
-    deactivateState.message = null
-    deactivateState.error = null
+  // deactivateState.message = null
+  // deactivateState.error = null
     passwordState.message = null
     passwordState.error = null
     passwordForm.oldPassword = ''
@@ -78,48 +83,48 @@ const toggleSuggestPref = () => {
   }
 }
 
-const canDeactivate = computed(() => accountUser.value?.status === 'ACTIVE' && !deactivateState.loading)
-const statusBadgeClass = computed(() => accountUser.value?.status.toLowerCase() ?? '')
+// const canDeactivate = computed(() => accountUser.value?.status === 'ACTIVE' && !deactivateState.loading)
+const statusBadgeClass = computed(() => (accountUser.value?.status ?? 'ACTIVE').toLowerCase())
 
-const handleDeactivate = async () => {
-  if (!accountUser.value) {
-    return
-  }
+// const handleDeactivate = async () => {
+//   if (!accountUser.value) {
+//     return
+//   }
 
-  if (!window.confirm('Are you sure you want to deactivate this account?')) {
-    return
-  }
+//   if (!window.confirm('Are you sure you want to deactivate this account?')) {
+//     return
+//   }
 
-  deactivateState.loading = true
-  deactivateState.error = null
-  deactivateState.message = null
+//   deactivateState.loading = true
+//   deactivateState.error = null
+//   deactivateState.message = null
 
-  try {
-    const resolveUserId = (id: any) => {
-      if (!id) return ''
-      if (typeof id === 'string') return id
-      if (typeof id === 'object' && 'value' in id) return String(id.value)
-      return String(id)
-    }
+//   try {
+//     const resolveUserId = (id: any) => {
+//       if (!id) return ''
+//       if (typeof id === 'string') return id
+//       if (typeof id === 'object' && 'value' in id) return String(id.value)
+//       return String(id)
+//     }
 
-    const uid = resolveUserId((accountUser.value as any).user_id)
-    const payload = { user_id: uid }
-    console.debug('[UserAccountPage] deactivate payload (normalized):', payload, 'original:', (accountUser.value as any).user_id)
-    if (!payload.user_id) throw new Error('Missing user_id for deactivate')
-    await userApi.deactivate(payload)
-    accountUser.value = { ...accountUser.value, status: 'INACTIVE' }
-    deactivateState.message = 'Account successfully deactivated.'
-    emit('user-updated', accountUser.value)
-    // If the current user just deactivated their own account, sign them out
-    emit('signOut')
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unable to deactivate account'
-    deactivateState.error = `${message} (user_id=${accountUser.value?.user_id ?? 'unknown'})`
-    console.error('[UserAccountPage] Deactivate error:', { error: e, user_id: accountUser.value?.user_id })
-  } finally {
-    deactivateState.loading = false
-  }
-}
+//     const uid = resolveUserId((accountUser.value as any).user_id)
+//     const payload = { user_id: uid }
+//     console.debug('[UserAccountPage] deactivate payload (normalized):', payload, 'original:', (accountUser.value as any).user_id)
+//     if (!payload.user_id) throw new Error('Missing user_id for deactivate')
+//     await userApi.deactivate(payload)
+//     accountUser.value = { ...accountUser.value, status: 'INACTIVE' }
+//     deactivateState.message = 'Account successfully deactivated.'
+//     emit('user-updated', accountUser.value)
+//     // If the current user just deactivated their own account, sign them out
+//     emit('signOut')
+//   } catch (e) {
+//     const message = e instanceof Error ? e.message : 'Unable to deactivate account'
+//     deactivateState.error = `${message} (user_id=${accountUser.value?.user_id ?? 'unknown'})`
+//     console.error('[UserAccountPage] Deactivate error:', { error: e, user_id: accountUser.value?.user_id })
+//   } finally {
+//     deactivateState.loading = false
+//   }
+// }
 
 const validatePasswordForm = () => {
   if (!passwordForm.oldPassword.trim() || !passwordForm.newPassword.trim() || !passwordForm.confirmPassword.trim()) {
@@ -157,9 +162,9 @@ const handleChangePassword = async () => {
 
   try {
     await userApi.changePassword({
-      user_id: accountUser.value.user_id,
-      old_password: passwordForm.oldPassword,
-      new_password: passwordForm.newPassword,
+      user: accountUser.value.user_id,
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
     })
     passwordState.message = 'Password updated successfully.'
     passwordForm.oldPassword = ''
@@ -190,12 +195,12 @@ const handleChangePassword = async () => {
           </button>
           <div class="heading-copy">
             <p class="eyebrow">Account Settings</p>
-            <h1>{{ accountUser.name }}</h1>
+            <h1>{{ accountUser.username }}</h1>
             <p class="ff-page-subtitle">Manage account status and credentials.</p>
           </div>
         </div>
         <div class="ff-header-actions">
-          <span class="status-pill" :class="statusBadgeClass">{{ accountUser.status }}</span>
+          <span class="status-pill" :class="statusBadgeClass">{{ accountUser.status ?? 'ACTIVE' }}</span>
         </div>
       </header>
 
@@ -205,8 +210,12 @@ const handleChangePassword = async () => {
             <h2 class="section-title">Profile Info</h2>
             <div class="profile-grid">
               <div>
-                <span class="field-label">Email</span>
-                <p class="field-value">{{ accountUser.email }}</p>
+                <span class="field-label">Username</span>
+                <p class="field-value">{{ accountUser.username }}</p>
+              </div>
+              <div>
+                <span class="field-label">Account Identifier</span>
+                <p class="field-value muted">Stored securely for account management.</p>
               </div>
             </div>
           </div>
@@ -306,6 +315,7 @@ const handleChangePassword = async () => {
 
           <div class="account-divider"></div>
 
+          <!--
           <div class="account-section deactivate-section">
             <div class="section-heading">
               <h2 class="section-title">Deactivate Account</h2>
@@ -339,6 +349,7 @@ const handleChangePassword = async () => {
               {{ deactivateState.loading ? 'Deactivating...' : 'Deactivate Account' }}
             </button>
           </div>
+          -->
         </section>
       </div>
     </div>
@@ -436,6 +447,11 @@ const handleChangePassword = async () => {
   color: var(--ff-text-base);
   font-weight: 600;
   word-break: break-all;
+}
+
+.field-value.muted {
+  color: var(--ff-text-muted);
+  font-weight: 500;
 }
 
 .status-pill {

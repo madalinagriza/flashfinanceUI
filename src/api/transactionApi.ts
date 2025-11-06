@@ -88,11 +88,33 @@ export const transactionApi = {
   async getTxInfo(request: GetTxInfoRequest): Promise<TransactionInfoResponse> {
     const primary = '/Transaction/getTxInfo'
     const fallback = '/Transaction/get_tx_info'
+
+    const coerceTxInfo = (payload: unknown): TransactionInfoResponse => {
+      if (Array.isArray(payload)) {
+        // Backend sometimes wraps the info object in an array; use the first entry.
+        return coerceTxInfo(payload[0])
+      }
+      if (payload && typeof payload === 'object') {
+        return payload as TransactionInfoResponse
+      }
+      return {}
+    }
+
     try {
-      return await apiClient.post<GetTxInfoRequest, TransactionInfoResponse>(primary, request)
+      const response = await apiClient.post<
+        GetTxInfoRequest,
+        TransactionInfoResponse | TransactionInfoResponse[] | null
+      >(primary, request)
+      return coerceTxInfo(response)
     } catch (err: any) {
-      console.warn(`getTxInfo primary endpoint ${primary} failed (${String(err?.message)}), retrying once`)
-      return await apiClient.post<GetTxInfoRequest, TransactionInfoResponse>(fallback, request)
+      console.warn(
+        `getTxInfo primary endpoint ${primary} failed (${String(err?.message)}), retrying once`
+      )
+      const fallbackResponse = await apiClient.post<
+        GetTxInfoRequest,
+        TransactionInfoResponse | TransactionInfoResponse[] | null
+      >(fallback, request)
+      return coerceTxInfo(fallbackResponse)
     }
   },
 }

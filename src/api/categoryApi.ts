@@ -19,7 +19,9 @@ import type {
   ListCategoryTransactionsRequest,
   CategoryTransactionEntry,
   GetCategoryMetricStatsRequest,
+  CategoryMetricStats,
   CategoryMetricStatsResponse,
+  UpdateCategoryTransactionRequest,
 } from './types'
 
 let latestMetricStatsRaw: unknown = null
@@ -53,31 +55,31 @@ export const categoryApi = {
     return apiClient.post<DeleteCategoryRequest, OkResponse>('/Category/delete', request)
   },
 
-  /**
-   * POST /api/Category/getCategoryNamesAndOwners
-   * Retrieves a list of category names and owners for the specified user.
-   */
-  async getCategoryNamesAndOwners(owner_id: string): Promise<CategoryNameOwner[]> {
-    const raw = await apiClient.post<{ owner_id: string }, any[]>(
-      '/Category/getCategoryNamesAndOwners',
-      { owner_id }
-    )
+  // /**
+  //  * POST /api/Category/getCategoryNamesAndOwners
+  //  * Retrieves a list of category names and owners for the specified user.
+  //  */
+  // async getCategoryNamesAndOwners(owner_id: string): Promise<CategoryNameOwner[]> {
+  //   const raw = await apiClient.post<{ owner_id: string }, any[]>(
+  //     '/Category/getCategoryNamesAndOwners',
+  //     { owner_id }
+  //   )
 
-    return (raw || [])
-      .map((r: any) => {
-        const categoryId = normalizeId(r?.category_id) ?? normalizeId(r?._id) ?? normalizeId(r)
-        if (!categoryId) return null
-        const ownerValue = normalizeId(r?.owner_id) ?? owner_id
-        const nameValue = normalizeString(r?.name) ?? ''
+  //   return (raw || [])
+  //     .map((r: any) => {
+  //       const categoryId = normalizeId(r?.category_id) ?? normalizeId(r?._id) ?? normalizeId(r)
+  //       if (!categoryId) return null
+  //       const ownerValue = normalizeId(r?.owner_id) ?? owner_id
+  //       const nameValue = normalizeString(r?.name) ?? ''
 
-        return {
-          category_id: categoryId,
-          name: nameValue,
-          owner_id: ownerValue,
-        } as CategoryNameOwner
-      })
-      .filter((entry): entry is CategoryNameOwner => entry !== null)
-  },
+  //       return {
+  //         category_id: categoryId,
+  //         name: nameValue,
+  //         owner_id: ownerValue,
+  //       } as CategoryNameOwner
+  //     })
+  //     .filter((entry): entry is CategoryNameOwner => entry !== null)
+  // },
 
   /**
    * POST /api/Category/getCategoriesFromOwner
@@ -122,6 +124,22 @@ export const categoryApi = {
    */
   async removeTransaction(request: RemoveCategoryTransactionRequest): Promise<OkResponse> {
     return apiClient.post<RemoveCategoryTransactionRequest, OkResponse>('/Category/removeTransaction', request)
+  },
+
+  /**
+   * POST /api/Category/updateTransaction
+   * Moves a transaction between categories for the same owner.
+   */
+  async updateTransaction(request: UpdateCategoryTransactionRequest): Promise<OkResponse> {
+    const primary = '/Category/updateTransaction'
+    const fallback = '/Category/update_transaction'
+
+    try {
+      return await apiClient.post<UpdateCategoryTransactionRequest, OkResponse>(primary, request)
+    } catch (err: any) {
+      console.warn(`categoryApi.updateTransaction primary ${primary} failed (${String(err?.message)}), trying fallback ${fallback}`)
+      return await apiClient.post<UpdateCategoryTransactionRequest, OkResponse>(fallback, request)
+    }
   },
 
   /**
@@ -212,7 +230,7 @@ export const categoryApi = {
       return fallback
     }
 
-    const normalizeMetrics = (value: any): CategoryMetricStatsResponse | null => {
+  const normalizeMetrics = (value: any): CategoryMetricStats | null => {
       if (!value || typeof value !== 'object') return null
 
       return {
@@ -223,29 +241,31 @@ export const categoryApi = {
       }
     }
 
-    if (Array.isArray(res)) {
-      for (const entry of res) {
-        const normalized = normalizeMetrics(entry)
-        if (normalized) return normalized
+    const normalizedList: CategoryMetricStatsResponse = []
+
+    const pushNormalized = (candidate: unknown) => {
+      const normalized = normalizeMetrics(candidate)
+      if (normalized) {
+        normalizedList.push(normalized)
       }
-      console.warn('getMetricStats: array response without usable metrics', res)
-      return {
+    }
+
+    if (Array.isArray(res)) {
+      res.forEach(pushNormalized)
+    } else {
+      pushNormalized(res)
+    }
+
+    if (normalizedList.length === 0) {
+      console.warn('getMetricStats: response without usable metrics entries', res)
+      normalizedList.push({
         total_amount: 0,
         transaction_count: 0,
         average_per_day: 0,
         days: 0,
-      }
+      })
     }
 
-    const direct = normalizeMetrics(res)
-    if (direct) return direct
-
-    console.warn('getMetricStats: unexpected response shape', res)
-    return {
-      total_amount: 0,
-      transaction_count: 0,
-      average_per_day: 0,
-      days: 0,
-    }
+    return normalizedList
   },
 }

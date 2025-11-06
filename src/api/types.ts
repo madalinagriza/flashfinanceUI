@@ -3,35 +3,50 @@
 // ===== User Types =====
 export interface User {
   user_id: string
-  email: string
-  name: string
-  status: 'ACTIVE' | 'INACTIVE'
+  username: string
+  status?: 'ACTIVE' | 'INACTIVE'
+  session?: string
 }
 
 export interface RegisterRequest {
-  email: string
-  name: string
+  username: string
   password: string
 }
 
 export interface AuthenticateRequest {
-  email: string
+  username: string
   password: string
 }
 
-export interface DeactivateRequest {
-  user_id: string
-}
+// export interface DeactivateRequest {
+//   user_id: string
+// }
 
 export interface ChangePasswordRequest {
-  user_id: string
-  old_password: string
-  new_password: string
+  user: string
+  oldPassword: string
+  newPassword: string
 }
 
-export interface ReactivateRequest {
-  email: string
-  new_password: string
+export interface LogoutRequest {
+  session: string
+}
+
+// export interface ReactivateRequest {
+//   email: string
+//   new_password: string
+// }
+
+export interface UserAuthenticationResponse {
+  user: string
+}
+
+export interface LoginResponse {
+  session: string
+}
+
+export interface LogoutResponse {
+  status: 'logged_out'
 }
 
 // ===== Transaction Types =====
@@ -69,9 +84,11 @@ export interface GetTxInfoRequest {
 }
 
 export interface TransactionInfoResponse {
-  date: string
-  merchant_text: string
-  amount: number
+  date?: string
+  merchant_text?: string
+  amount?: number
+  tx_name?: string
+  tx_merchant?: string
 }
 
 // ===== Category Types =====
@@ -135,6 +152,13 @@ export interface RemoveCategoryTransactionRequest {
   tx_id: string
 }
 
+export interface UpdateCategoryTransactionRequest {
+  owner_id: string
+  tx_id: string
+  old_category_id: string
+  new_category_id: string
+}
+
 export interface MoveTransactionToTrashRequest {
   owner_id: string
   from_category_id: string
@@ -163,12 +187,14 @@ export interface GetCategoryMetricStatsRequest {
   period: CategoryMetricPeriod
 }
 
-export interface CategoryMetricStatsResponse {
+export interface CategoryMetricStats {
   total_amount: number
   transaction_count: number
   average_per_day: number
   days: number
 }
+
+export type CategoryMetricStatsResponse = CategoryMetricStats[]
 
 // ===== Label Types =====
 export interface Label {
@@ -218,10 +244,10 @@ export interface GetLabelRequest {
   tx_id: string
 }
 
-export interface GetCategoryHistoryRequest {
-  user_id: string
-  category_id: string
-}
+// export interface GetCategoryHistoryRequest {
+//   user_id: string
+//   category_id: string
+// }
 
 export interface HasLabelsForCategoryRequest {
   user_id: string
@@ -284,4 +310,15 @@ export interface SuggestLabelRequest {
 export interface SuggestLabelResponse {
   id: string
   name: string
+}
+
+// ===== File Upload Types =====
+export interface UploadFileRequest {
+  owner: string
+  name: string
+  content: string
+}
+
+export interface UploadFileResponse {
+  file: string
 }

@@ -10,6 +10,7 @@ import CategoryDetailPage from './components/CategoryDetailPage.vue'
 import UnlabeledTransactionsPage from './components/UnlabeledTransactionsPage.vue'
 import LabelingPage from './components/LabelingPage.vue'
 import AppShell from './components/AppShell.vue'
+import { userApi } from './api'
 import type { CategoryNameOwner, Transaction, User } from './api'
 
 type Page =
@@ -28,6 +29,62 @@ const currentUser = ref<User | null>(null)
 const transactionToLabel = ref<Transaction | null>(null)
 const selectedCategory = ref<CategoryNameOwner | null>(null)
 const selectedAccountUser = ref<User | null>(null)
+
+const resolveSessionId = (): string | null => {
+  if (currentUser.value?.session) {
+    return currentUser.value.session
+  }
+
+  if (typeof document !== 'undefined') {
+    const cookieMatch = document.cookie.match(/(?:^|;\s*)session=([^;]+)/)
+    if (cookieMatch && cookieMatch[1]) {
+      try {
+        return decodeURIComponent(cookieMatch[1])
+      } catch (err) {
+        console.warn('Failed to decode session cookie', err)
+        return cookieMatch[1]
+      }
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const sessionStored = window.sessionStorage?.getItem('ff:session')
+      if (sessionStored) return sessionStored
+    } catch (err) {
+      console.warn('Unable to read sessionStorage for session id', err)
+    }
+
+    try {
+      const localStored = window.localStorage?.getItem('ff:session')
+      if (localStored) return localStored
+    } catch (err) {
+      console.warn('Unable to read localStorage for session id', err)
+    }
+  }
+
+  return null
+}
+
+const clearStoredSession = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage?.removeItem('ff:session')
+    } catch (err) {
+      console.warn('Unable to clear sessionStorage for session id', err)
+    }
+
+    try {
+      window.localStorage?.removeItem('ff:session')
+    } catch (err) {
+      console.warn('Unable to clear localStorage for session id', err)
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    document.cookie = 'session=; Max-Age=0; path=/'
+  }
+}
 
 const navigateTo = (page: Page | string) => {
   // A simple type guard to be safe
@@ -58,7 +115,21 @@ const handleSignIn = (user: User) => {
   currentPage.value = 'main'
 }
 
-const handleSignOut = () => {
+const handleSignOut = async () => {
+  const sessionId = resolveSessionId() ?? currentUser.value?.user_id ?? ''
+
+  if (sessionId) {
+    try {
+      await userApi.logout({ session: sessionId })
+    } catch (err) {
+      console.warn('Logout request failed', err)
+    }
+  } else {
+    console.warn('No session identifier available; skipping logout request')
+  }
+
+  clearStoredSession()
+
   currentUser.value = null
   selectedCategory.value = null
   selectedAccountUser.value = null

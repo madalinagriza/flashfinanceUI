@@ -12,7 +12,7 @@ import type {
   GetLabelRequest,
   GetStagedLabelsRequest,
   StagedLabel,
-  GetCategoryHistoryRequest,
+  // GetCategoryHistoryRequest,
   HasLabelsForCategoryRequest,
   SuggestLabelRequest,
   LabelTxIdResponse,
@@ -31,11 +31,11 @@ export const labelApi = {
   },
 
   /**
-   * POST /api/Label/discard
+   * POST /api/Label/discardUnstagedToTrash
    * Stages a transaction to be moved to the built-in Trash category.
    */
   async discard(request: DiscardLabelRequest): Promise<LabelTxIdResponse> {
-    return apiClient.post<DiscardLabelRequest, LabelTxIdResponse>('/Label/discard', request)
+    return apiClient.post<DiscardLabelRequest, LabelTxIdResponse>('/Label/discardUnstagedToTrash', request)
   },
 
   /**
@@ -47,11 +47,11 @@ export const labelApi = {
   },
 
   /**
-   * POST /api/Label/cancel
+   * POST /api/Label/cancelSession
    * Deletes all staged labels for a user without committing them.
    */
   async cancel(request: CancelLabelRequest): Promise<Record<string, never>> {
-    return apiClient.post<CancelLabelRequest, Record<string, never>>('/Label/cancel', request)
+    return apiClient.post<CancelLabelRequest, Record<string, never>>('/Label/cancelSession', request)
   },
 
   /**
@@ -67,7 +67,7 @@ export const labelApi = {
    * Reassigns a transaction's label to the user's built-in Trash category.
    */
   async remove(request: RemoveLabelRequest): Promise<LabelTxIdResponse> {
-    return apiClient.post<RemoveLabelRequest, LabelTxIdResponse>('/Label/remove', request)
+    return apiClient.post<RemoveLabelRequest, LabelTxIdResponse>('/Label/removeCommittedLabel', request)
   },
 
   /**
@@ -81,16 +81,16 @@ export const labelApi = {
     return apiClient.post<GetLabelRequest, Label[]>('/Label/getLabel', request)
   },
 
-  /**
-   * POST /api/Label/getCategoryHistory
-   * Returns a list of transaction IDs associated with a specific category for a user.
-   */
-  async getCategoryHistory(request: GetCategoryHistoryRequest): Promise<string[]> {
-    return apiClient.post<GetCategoryHistoryRequest, string[]>(
-      '/Label/getCategoryHistory',
-      request
-    )
-  },
+  // /**
+  //  * POST /api/Label/getCategoryHistory
+  //  * Returns a list of transaction IDs associated with a specific category for a user.
+  //  */
+  // async getCategoryHistory(request: GetCategoryHistoryRequest): Promise<string[]> {
+  //   return apiClient.post<GetCategoryHistoryRequest, string[]>(
+  //     '/Label/getCategoryHistory',
+  //     request
+  //   )
+  // },
 
   /**
    * POST /api/Label/all

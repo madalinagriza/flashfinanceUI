@@ -7,8 +7,7 @@ const emit = defineEmits<{
   navigate: [page: string]
 }>()
 
-const email = ref('')
-const name = ref('')
+const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 
@@ -19,8 +18,7 @@ const registeredUser = ref<User | null>(null)
 const lastRegisteredUserId = ref<string | null>(null)
 
 const resetForm = () => {
-  email.value = ''
-  name.value = ''
+  username.value = ''
   password.value = ''
   confirmPassword.value = ''
   error.value = null
@@ -31,8 +29,8 @@ const handleRegister = async () => {
   success.value = false
 
   // Basic validation
-  if (!email.value || !name.value || !password.value) {
-    error.value = 'All fields are required'
+  if (!username.value || !password.value) {
+    error.value = 'Username and password are required'
     return
   }
 
@@ -50,13 +48,12 @@ const handleRegister = async () => {
 
   try {
     const user = await userApi.register({
-      email: email.value,
-      name: name.value,
+      username: username.value,
       password: password.value,
     })
 
-  registeredUser.value = user
-  lastRegisteredUserId.value = user?.user_id ?? null
+    registeredUser.value = user
+    lastRegisteredUserId.value = user?.user_id ?? null
     success.value = true
     resetForm()
     
@@ -65,7 +62,7 @@ const handleRegister = async () => {
       emit('navigate', 'signin')
     }, 1500)
   } catch (e) {
-    error.value = 'Registration Failed: Email already in use'
+    error.value = 'Registration failed: username already in use'
     console.error('Registration error:', e)
   } finally {
     loading.value = false
@@ -82,24 +79,12 @@ const handleRegister = async () => {
 
       <form @submit.prevent="handleRegister">
         <div class="form-group">
-          <label for="name">Full Name</label>
+          <label for="username">Username</label>
           <input
-            id="name"
-            v-model="name"
+            id="username"
+            v-model="username"
             type="text"
-            placeholder="Enter your full name"
-            :disabled="loading"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="Enter your email"
+            placeholder="Enter a username"
             :disabled="loading"
             required
           />
@@ -147,8 +132,7 @@ const handleRegister = async () => {
             </svg>
           </span>
           <span>
-            Registration successful! Welcome, {{ registeredUser?.name }}!
-            <small v-if="lastRegisteredUserId" class="sr-only">New user id: {{ lastRegisteredUserId }}</small>
+            Registration successful! Welcome, {{ registeredUser?.username }}!
           </span>
         </div>
 

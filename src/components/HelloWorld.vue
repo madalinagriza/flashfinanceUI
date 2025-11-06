@@ -13,7 +13,14 @@ const fetchUsers = async () => {
   loading.value = true
   error.value = null
   try {
-    users.value = await userApi.all()
+    const result = await userApi.all()
+    if (!result.length) {
+      users.value = []
+      error.value = 'Listing users is not available under UserAuthentication.'
+      return
+    }
+
+    users.value = result
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to fetch users'
     console.error('Error fetching users:', e)
@@ -49,7 +56,8 @@ const fetchUsers = async () => {
         <h4>Users ({{ users.length }}):</h4>
         <ul style="text-align: left;">
           <li v-for="user in users" :key="user.user_id">
-            <strong>{{ user.name }}</strong> ({{ user.email }}) - {{ user.status }}
+            <strong>{{ user.username }}</strong>
+            <span class="id-hidden">· Account identifier hidden</span>
           </li>
         </ul>
       </div>
@@ -106,6 +114,11 @@ ul {
 }
 li {
   padding: 0.25rem 0;
+}
+
+.id-hidden {
+  color: var(--ff-text-muted);
+  font-size: 0.85rem;
 }
 
 .alert {

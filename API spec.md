@@ -172,6 +172,45 @@
 }
 ```
 ---
+
+### POST /api/Category/updateTransaction
+
+**Description:** Moves a transaction from one category to another for a given owner.
+
+**Requirements:**
+- The transaction must exist in the `old_category_id`.
+- The `new_category_id` must exist.
+
+**Effects:**
+- The transaction is removed from the `old_category_id`'s metrics.
+- The transaction is added to the `new_category_id`'s metrics.
+- Returns `{ok: true}` on success.
+
+**Request Body:**
+```json
+{
+  "owner_id": "string",
+  "tx_id": "string",
+  "old_category_id": "string",
+  "new_category_id": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "ok": "boolean"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+---
 ### POST /api/Category/getCategoryNameById
 
 **Description:** Retrieves the name of a single category by its ID.
@@ -333,12 +372,12 @@
 
 **Success Response Body (Action):**
 ```json
-{
+[{
   "total_amount": "Number",
   "transaction_count": "Number",
   "average_per_day": "Number",
   "days": "Number"
-}
+}]
 ```
 
 **Error Response Body:**
@@ -426,7 +465,7 @@
 }
 ```
 ---
-### POST /api/Label/discard
+### POST /api/Label/discardUnstagedToTrash
 
 **Description:** Stages a transaction to be moved to the built-in Trash category.
 
@@ -493,7 +532,7 @@
 }
 ```
 ---
-### POST /api/Label/cancel
+### POST /api/Label/cancelSession
 
 **Description:** Deletes all of a user's staged labels without committing them.
 
@@ -560,7 +599,7 @@
 }
 ```
 ---
-### POST /api/Label/remove
+### POST /api/Label/removeCommittedLabel
 
 **Description:** Moves a labeled transaction to the built-in Trash category.
 
@@ -1146,29 +1185,186 @@
 }
 ```
 ---
-# API Specification: User Concept
 
-**Purpose:** establish a unique identity for each person and control access to app functionality so that data is isolated per account
+# API Specification: UserAuthentication Concept
+
+**Purpose:** To verify the identity of a user, enabling secure access to the system by managing user registration and login credentials.
 
 ---
 
 ## API Endpoints
 
-### POST /api/User/register
+### POST /api/UserAuthentication/register
 
-**Description:** Creates a new user account.
+**Description:** Creates a new user account with a unique username and a password.
 
 **Requirements:**
-- email is not used by any existing user
+- The provided `username` must not already be in use by an existing user.
+- The `password` must meet the system's complexity requirements (e.g., minimum length).
 
 **Effects:**
-- creates a new user with a fresh user_id, password_hash derived from password, status ACTIVE; adds the user to Users; returns the created user
+- A new `User` entity is created and stored.
+- The user's `username` is set to the provided `username`.
+- The user's password is securely hashed and stored.
+- Returns the unique ID of the newly created `user`.
 
 **Request Body:**
 ```json
 {
-  "email": "string",
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "user": "ID"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
+### POST /api/UserAuthentication/login
+
+**Description:** Authenticates a user using their username and password.
+
+**Requirements:**
+- A user with the given `username` must exist.
+- The provided `password` must correctly match the stored password for that user.
+
+**Effects:**
+- If authentication is successful, returns the unique ID of the authenticated `user`.
+
+**Request Body:**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "user": "ID"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+---
+### POST /api/UserAuthentication/changePassword
+
+**Description:** Updates the password for a specified user.
+
+**Requirements:**
+- The `user` identified by the `user` ID must exist.
+- The `oldPassword` must match the user's current password.
+- The `newPassword` must meet system complexity requirements.
+
+**Effects:**
+- The user's stored password hash is updated to a new hash derived from the `newPassword`.
+- Returns an empty object on success.
+
+**Request Body:**
+```json
+{
+  "user": "ID",
+  "oldPassword": "string",
+  "newPassword": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+
+# response:
+
+# API Specification: FileUploading Concept
+
+**Purpose:** manage user-uploaded files, including storage, retrieval, and deletion
+
+---
+
+## API Endpoints
+
+### POST /api/FileUploading/uploadFile
+
+**Description:** Creates a new file record with the provided content and metadata.
+
+**Requirements:**
+- `owner` exists
+- `name` is a non-empty string
+
+**Effects:**
+- Creates a new File `f`.
+- Sets its owner to `owner`, name to `name`, and content to `content`.
+- Records the creation timestamp.
+- Returns the new File ID as `file`.
+
+**Request Body:**
+```json
+{
+  "owner": "User",
   "name": "string",
+  "content": "string"
+}
+```
+
+**Success Response Body (Action):**
+```json
+{
+  "file": "File"
+}
+```
+
+**Error Response Body:**
+```json
+{
+  "error": "string"
+}
+```
+# API Endpoint: User Login
+
+**Purpose:** authenticate a user and create a session
+
+---
+
+### POST /login
+
+**Description:** Verifies user credentials and, on success, creates a session for the user.
+
+**Requirements:**
+- `username` and `password` must be provided
+- the `username` must exist and the `password` must match the stored credentials
+
+**Effects:**
+- when credentials are valid, a new session is created and associated with the user
+- returns the created `session` identifier to the requester
+
+**Request Body:**
+```json
+{
+  "username": "string",
   "password": "string"
 }
 ```
@@ -1176,12 +1372,7 @@
 **Success Response Body (Action):**
 ```json
 {
-  "user": {
-    "user_id": "ID",
-    "email": "string",
-    "name": "string",
-    "status": "string"
-  }
+  "session": "ID"
 }
 ```
 
@@ -1191,34 +1382,37 @@
   "error": "string"
 }
 ```
----
-### POST /api/User/authenticate
 
-**Description:** Authenticates a user and provides their user object upon success.
+---
+# API Endpoint: Session Logout
+
+**Purpose:** terminate a user's active session
+
+---
+
+### POST /logout
+
+**Description:** Deletes (invalidates) an active session — logs the user out.
 
 **Requirements:**
-- there exists a user with the given email whose password_hash matches password and whose status is ACTIVE
+- a valid `session` identifier is provided and corresponds to an active session
+- the session maps to an existing `user`
 
 **Effects:**
-- returns that user
+- deletes the session from session storage (invalidates the session)
+- returns a `logged_out` status to the requester
 
 **Request Body:**
 ```json
 {
-  "email": "string",
-  "password": "string"
+  "session": "ID"
 }
 ```
 
 **Success Response Body (Action):**
 ```json
 {
-  "user": {
-    "user_id": "ID",
-    "email": "string",
-    "name": "string",
-    "status": "string"
-  }
+  "status": "logged_out"
 }
 ```
 
@@ -1228,132 +1422,3 @@
   "error": "string"
 }
 ```
----
-### POST /api/User/deactivate
-
-**Description:** Deactivates a user's account, preventing future logins.
-
-**Requirements:**
-- a user with user_id exists
-
-**Effects:**
-- sets the user's status to INACTIVE
-
-**Request Body:**
-```json
-{
-  "user_id": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-### POST /api/User/changePassword
-
-**Description:** Changes the password for an existing user account.
-
-**Requirements:**
-- a user with user_id exists and old_password matches the stored password_hash
-
-**Effects:**
-- updates password_hash with new_password; returns true
-
-**Request Body:**
-```json
-{
-  "user_id": "string",
-  "old_password": "string",
-  "new_password": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{
-  "ok": "boolean"
-}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-### POST /api/User/reactivate
-
-**Description:** Reactivates an inactive user account with a new password.
-
-**Requirements:**
-- a user with the given email exists and `status = INACTIVE`
-
-**Effects:**
-- sets the user’s `status` to ACTIVE; updates the user’s `password_hash` with the hash of `new_password`; returns true
-
-**Request Body:**
-```json
-{
-  "email": "string",
-  "new_password": "string"
-}
-```
-
-**Success Response Body (Action):**
-```json
-{
-  "ok": "boolean"
-}
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----
-### POST /api/User/all
-
-**Description:** Retrieves a list of all users in the system.
-
-**Requirements:**
-- (None, typically requires admin privileges not specified in the concept).
-
-**Effects:**
-- Returns an array of all user objects.
-
-**Request Body:**
-```json
-{}
-```
-
-**Success Response Body (Query):**
-```json
-[
-  {
-    "user_id": "ID",
-    "email": "string",
-    "name": "string",
-    "status": "string"
-  }
-]
-```
-
-**Error Response Body:**
-```json
-{
-  "error": "string"
-}
-```
----

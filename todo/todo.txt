@@ -1,0 +1,2 @@
+[x] Update user API module to call /UserAuthentication endpoints per new spec.
+[x] Adjust shared types and consuming components to match new UserAuthentication response shape.

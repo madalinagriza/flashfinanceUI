@@ -8,7 +8,7 @@ const emit = defineEmits<{
   signIn: [user: User]
 }>()
 
-const email = ref('')
+const username = ref('')
 const password = ref('')
 
 const loading = ref(false)
@@ -16,8 +16,40 @@ const error = ref<string | null>(null)
 const success = ref(false)
 const authenticatedUser = ref<User | null>(null)
 
+const persistSession = (sessionId: string | null) => {
+  if (typeof window !== 'undefined') {
+    try {
+      if (sessionId) {
+        window.sessionStorage?.setItem('ff:session', sessionId)
+      } else {
+        window.sessionStorage?.removeItem('ff:session')
+      }
+    } catch (err) {
+      console.warn('Unable to update sessionStorage for session id', err)
+    }
+
+    try {
+      if (sessionId) {
+        window.localStorage?.setItem('ff:session', sessionId)
+      } else {
+        window.localStorage?.removeItem('ff:session')
+      }
+    } catch (err) {
+      console.warn('Unable to update localStorage for session id', err)
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    if (sessionId) {
+      document.cookie = `session=${encodeURIComponent(sessionId)}; path=/`
+    } else {
+      document.cookie = 'session=; Max-Age=0; path=/'
+    }
+  }
+}
+
 const resetForm = () => {
-  email.value = ''
+  username.value = ''
   password.value = ''
   error.value = null
 }
@@ -27,8 +59,8 @@ const handleSignIn = async () => {
   success.value = false
 
   // Basic validation
-  if (!email.value || !password.value) {
-    error.value = 'Email and password are required'
+  if (!username.value || !password.value) {
+    error.value = 'Username and password are required'
     return
   }
 
@@ -36,9 +68,11 @@ const handleSignIn = async () => {
 
   try {
     const user = await userApi.authenticate({
-      email: email.value,
+      username: username.value,
       password: password.value,
     })
+
+    persistSession(user.session ?? null)
 
     authenticatedUser.value = user
     success.value = true
@@ -48,6 +82,8 @@ const handleSignIn = async () => {
       emit('signIn', user)
     }, 1000)
   } catch (e) {
+    persistSession(null)
+
     // Normalize server message and strip common prefixes
     let serverMsgRaw = e instanceof Error ? e.message : String(e)
     if (!serverMsgRaw) serverMsgRaw = String(e)
@@ -71,12 +107,12 @@ const handleSignIn = async () => {
 
       <form @submit.prevent="handleSignIn">
         <div class="form-group">
-          <label for="email">Email</label>
+          <label for="username">Username</label>
           <input
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="Enter your email"
+            id="username"
+            v-model="username"
+            type="text"
+            placeholder="Enter your username"
             :disabled="loading"
             required
           />
@@ -112,8 +148,7 @@ const handleSignIn = async () => {
             </svg>
           </span>
           <span>
-            Welcome back, {{ authenticatedUser?.name }}!
-            <small>Status: {{ authenticatedUser?.status }}</small>
+            Welcome back, {{ authenticatedUser?.username }}!
           </span>
         </div>
 

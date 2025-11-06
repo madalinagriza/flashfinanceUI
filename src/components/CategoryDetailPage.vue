@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { categoryApi, labelApi, transactionApi } from '../api'
-import { normalizeId } from '../utils/normalize'
+import { normalizeId, normalizeString } from '../utils/normalize'
 import type {
   CategoryNameOwner,
   CategoryTransactionEntry,
-  CategoryMetricStatsResponse,
-  TransactionInfoResponse,
+  CategoryMetricStats,
   User,
 } from '../api'
 
-type CategoryHistoryRow = CategoryTransactionEntry & { display_name?: string }
+type CategoryHistoryRow = CategoryTransactionEntry & {
+  display_name?: string
+  merchant_text?: string | null
+}
 
 const props = defineProps<{
   user: User | null
@@ -31,7 +33,7 @@ const transactionsRaw = ref('')
 
 const metricsState = reactive<
   | { status: 'idle' | 'loading' }
-  | { status: 'loaded'; data: CategoryMetricStatsResponse }
+  | { status: 'loaded'; data: CategoryMetricStats }
   | { status: 'error'; error: string }
 >({ status: 'idle' })
 
@@ -49,6 +51,12 @@ const DEFAULT_METRICS_START = '2024-10-30'
 
 const metricsStartDate = ref('')
 const metricsEndDate = ref('')
+const EMPTY_METRICS: CategoryMetricStats = {
+  total_amount: 0,
+  transaction_count: 0,
+  average_per_day: 0,
+  days: 0,
+}
 
 const initializeMetricsPeriod = () => {
   metricsStartDate.value = DEFAULT_METRICS_START
@@ -154,10 +162,39 @@ const loadTransactions = async () => {
         }
         try {
           const info = await transactionApi.getTxInfo({ owner_id: ownerId.value, tx_id: entry.tx_id })
-          const displayName = (info as any)?.tx_name
-            ?? (info as any)?.merchant_text
-            ?? entry.tx_id
-          return { ...entry, display_name: displayName }
+          const merchantText = normalizeString((info as any)?.merchant_text ?? (info as any)?.tx_merchant) ?? null
+          const txName = normalizeString((info as any)?.tx_name ?? (info as any)?.name) ?? null
+
+          const resolveAmount = (): number | null => {
+            const rawAmount = (info as any)?.amount
+            if (typeof rawAmount === 'number' && Number.isFinite(rawAmount)) return rawAmount
+            if (typeof rawAmount === 'string' && rawAmount.trim()) {
+              const parsed = Number(rawAmount.trim())
+              return Number.isFinite(parsed) ? parsed : null
+            }
+            return null
+          }
+
+          const resolveDate = (): string | null => {
+            const rawDate = (info as any)?.date ?? (info as any)?.tx_date ?? (info as any)?.transaction_date
+            if (!rawDate) return null
+            const normalizedDate = normalizeString(rawDate)
+            if (!normalizedDate) return null
+            const parsed = new Date(normalizedDate)
+            return Number.isNaN(parsed.getTime()) ? normalizedDate : parsed.toISOString()
+          }
+
+          const amountFromInfo = resolveAmount()
+          const dateFromInfo = resolveDate()
+          const displayName = merchantText || txName || entry.tx_id
+
+          return {
+            ...entry,
+            amount: amountFromInfo ?? entry.amount,
+            tx_date: dateFromInfo ?? entry.tx_date,
+            display_name: displayName,
+            merchant_text: merchantText,
+          }
         } catch (infoErr) {
           console.warn('CategoryDetail: failed to fetch transaction info for history row', entry.tx_id, infoErr)
           return { ...entry, display_name: entry.tx_id }
@@ -214,10 +251,11 @@ const loadMetrics = async () => {
     period,
   }
   try {
-    const result = await categoryApi.getMetricStats(requestPayload)
+  const response = await categoryApi.getMetricStats(requestPayload)
+  const firstEntry = response[0] ?? { ...EMPTY_METRICS }
     metricsState.status = 'loaded'
-    ;(metricsState as any).data = result
-    metricsRaw.value = JSON.stringify({ requestPayload, response: result }, null, 2)
+  ;(metricsState as any).data = firstEntry
+  metricsRaw.value = JSON.stringify({ requestPayload, response }, null, 2)
   } catch (error: any) {
     metricsState.status = 'error'
     ;(metricsState as any).error = error?.message ?? 'Failed to load metrics.'
@@ -301,40 +339,11 @@ const confirmMove = async () => {
   try {
     await labelApi.update({ user_id: owner, tx_id: txId, new_category_id: destinationId })
 
-    try {
-      await categoryApi.removeTransaction({
-        owner_id: owner,
-        category_id: currentCategoryId,
-        tx_id: txId,
-      })
-    } catch (removeErr: any) {
-      console.warn('CategoryDetail: failed to remove transaction from current category', removeErr)
-      const message = removeErr instanceof Error
-        ? removeErr.message
-        : removeErr?.response?.data?.error ?? 'Failed to remove transaction from current category.'
-      throw new Error(message)
-    }
-
-    let txInfo: TransactionInfoResponse | null = null
-    try {
-      txInfo = await transactionApi.getTxInfo({ owner_id: owner, tx_id: txId })
-    } catch (infoErr) {
-      console.warn('CategoryDetail: failed to fetch transaction info, falling back to defaults', infoErr)
-    }
-
-    const amount = typeof txInfo?.amount === 'number' && Number.isFinite(txInfo.amount)
-      ? txInfo.amount
-      : Number((txInfo as any)?.amount ?? 0) || 0
-    const txDate = typeof txInfo?.date === 'string' && txInfo.date.length > 0
-      ? txInfo.date
-      : new Date().toISOString()
-
-    await categoryApi.addTransaction({
+    await categoryApi.updateTransaction({
       owner_id: owner,
-      category_id: destinationId,
       tx_id: txId,
-      amount,
-      tx_date: txDate,
+      old_category_id: currentCategoryId,
+      new_category_id: destinationId,
     })
 
     moveState.message = `Moved transaction to ${categoryNameById(destinationId)}.`
@@ -653,7 +662,7 @@ const goBack = () => {
                   <td>{{ formatDate(tx.tx_date) }}</td>
                   <td>{{ formatCurrency(tx.amount) }}</td>
                   <td>
-                    <div class="tx-name">{{ tx.display_name || tx.tx_id }}</div>
+                    <div class="tx-name">{{ tx.merchant_text || tx.display_name || tx.tx_id }}</div>
                     <!-- Transaction ID hidden in UI for privacy; tx.tx_id still used internally -->
                   </td>
                   <td class="actions-cell">
