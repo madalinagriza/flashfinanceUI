@@ -190,7 +190,9 @@ export const transactionApi = {
       const resp = await apiClient.post<ImportTransactionsRequest, unknown>(primary, request)
       console.debug('transactionApi.importTransactions: used', primary)
       const parsed = unwrapTransactions(resp)
-      if (!parsed.length) {
+      const record = asRecord(resp)
+      const recognizedWrapper = Array.isArray(record?.results) || record?.ok === true
+      if (!parsed.length && !recognizedWrapper) {
         console.warn('transactionApi.importTransactions: unexpected response shape', resp)
       }
       return parsed
@@ -248,7 +250,9 @@ export const transactionApi = {
     )
     console.debug('transactionApi.getUnlabeledTransactions: used', primary)
     const parsed = unwrapTransactions(resp)
-    if (!parsed.length) {
+    const record = asRecord(resp)
+    const recognizedWrapper = Array.isArray(record?.results)
+    if (!parsed.length && !recognizedWrapper) {
       console.warn('transactionApi.getUnlabeledTransactions: unexpected response shape', resp)
     }
     return parsed
