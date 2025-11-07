@@ -185,10 +185,8 @@ export const transactionApi = {
    */
   async importTransactions(request: ImportTransactionsRequest): Promise<Transaction[]> {
     // Prefer legacy underscore endpoint per current backend, fall back to camelCase
-    const primary = '/Transaction/import_transactions'
-    const fallback = '/Transaction/importTransactions'
+    const primary = '/Transaction/importTransactions'
 
-    try {
       const resp = await apiClient.post<ImportTransactionsRequest, unknown>(primary, request)
       console.debug('transactionApi.importTransactions: used', primary)
       const parsed = unwrapTransactions(resp)
@@ -196,17 +194,6 @@ export const transactionApi = {
         console.warn('transactionApi.importTransactions: unexpected response shape', resp)
       }
       return parsed
-    } catch (err: any) {
-      // If primary fails for any reason, try fallback
-      console.warn(`importTransactions primary endpoint ${primary} failed (${String(err?.message)}), trying fallback ${fallback}`)
-      const resp2 = await apiClient.post<ImportTransactionsRequest, unknown>(fallback, request)
-      console.debug('transactionApi.importTransactions: used', fallback)
-      const parsed = unwrapTransactions(resp2)
-      if (!parsed.length) {
-        console.warn('transactionApi.importTransactions: unexpected fallback response shape', resp2)
-      }
-      return parsed
-    }
   },
 
   /**
