@@ -247,7 +247,6 @@ const wasStagedHere = ref(false);
 // Session state: queue of unlabeled transactions and current pointer
 const sessionTransactions = ref<Transaction[]>([]);
 const sessionIndex = ref(0);
-const sessionStagedTxIds = ref<Set<string>>(new Set());
 
 // Active transaction for this page (falls back to prop)
 const activeTx = ref<Transaction | null>(null);
@@ -401,7 +400,6 @@ const stageCategory = async (category: CategoryNameOwner) => {
 
     stageMessage.value = `Staged category "${category.name}". Click "Finalize Session" to complete.`;
     wasStagedHere.value = true;
-    sessionStagedTxIds.value.add(txId);
     // Auto-advance to the next transaction after successful staging
     nextTx();
   } catch (err) {
@@ -433,28 +431,18 @@ const finalizeLabeling = async () => {
   finalizeMessage.value = null;
 
   try {
-    let stagedCount = 0;
-    try {
-      const stagedResponse = await labelApi.getStagedLabels({ session });
-      stagedCount = Array.isArray(stagedResponse) ? stagedResponse.length : 0;
-    } catch (fetchErr) {
-      console.error('Failed to fetch staged labels before finalize', fetchErr);
+    const finalizeResponse = await labelApi.finalize({ session });
+    let responseMessage: string | null = null;
+
+    if (finalizeResponse && typeof finalizeResponse === 'object') {
+      const payload = finalizeResponse as Record<string, unknown>;
+      const messageCandidate = payload.message;
+      if (typeof messageCandidate === 'string' && messageCandidate.trim().length > 0) {
+        responseMessage = messageCandidate.trim();
+      }
     }
 
-    if (stagedCount === 0 && sessionStagedTxIds.value.size > 0) {
-      stagedCount = sessionStagedTxIds.value.size;
-    }
-
-    // Finalize all staged labels (server now handles marking and metric updates internally)
-  await labelApi.finalize({ session });
-
-    // Transaction/mark_labeled and Category/addTransaction are now handled by finalize on the server.
-
-    sessionStagedTxIds.value.clear();
-
-    finalizeMessage.value = stagedCount > 0
-      ? `Finalized ${stagedCount} labeled transaction(s).`
-      : 'No transactions were staged; nothing to finalize.';
+    finalizeMessage.value = responseMessage ?? 'Labeling session finalized.';
     
     // Navigate back to unlabeled list after brief delay
     setTimeout(() => {
@@ -487,7 +475,6 @@ const cancelLabelingSession = async () => {
 
   try {
     await labelApi.cancel({ session });
-    sessionStagedTxIds.value.clear();
     sessionTransactions.value = [];
     sessionIndex.value = 0;
     activeTx.value = null;
@@ -536,7 +523,6 @@ const discardCurrentTx = async () => {
 
     stageMessage.value = 'Transaction staged for Trash.';
     wasStagedHere.value = true;
-    sessionStagedTxIds.value.add(txId);
     nextTx();
   } catch (err) {
     stageError.value = err instanceof Error ? err.message : 'Failed to discard transaction.';

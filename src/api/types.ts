@@ -218,6 +218,13 @@ export interface FinalizeLabelRequest {
   session: string
 }
 
+export interface FinalizeLabelResponse {
+  message?: string
+  finalized?: number
+  staged?: number
+  [key: string]: unknown
+}
+
 export interface CancelLabelRequest {
   session: string
 }

@@ -5,6 +5,7 @@ import type {
   Label,
   StageLabelRequest,
   FinalizeLabelRequest,
+  FinalizeLabelResponse,
   CancelLabelRequest,
   UpdateLabelRequest,
   RemoveLabelRequest,
@@ -42,8 +43,8 @@ export const labelApi = {
    * POST /api/Label/finalize
    * Commits all staged labels for a user, turning them into permanent labels and history records.
    */
-  async finalize(request: FinalizeLabelRequest): Promise<Record<string, never>> {
-    return apiClient.post<FinalizeLabelRequest, Record<string, never>>('/Label/finalize', request)
+  async finalize(request: FinalizeLabelRequest): Promise<FinalizeLabelResponse> {
+    return apiClient.post<FinalizeLabelRequest, FinalizeLabelResponse>('/Label/finalize', request)
   },
 
   /**
@@ -70,16 +71,16 @@ export const labelApi = {
     return apiClient.post<RemoveLabelRequest, LabelTxIdResponse>('/Label/removeCommittedLabel', request)
   },
 
-  /**
-   * POST /api/Label/getLabel
-   * Returns the label document for the given user and transaction.
-   */
-  async getStagedLabels(request: GetStagedLabelsRequest): Promise<StagedLabel[]> {
-    return apiClient.post<GetStagedLabelsRequest, StagedLabel[]>('/Label/getStagedLabels', request)
-  },
-  async getLabel(request: GetLabelRequest): Promise<Label[]> {
-    return apiClient.post<GetLabelRequest, Label[]>('/Label/getLabel', request)
-  },
+  // /**
+  //  * POST /api/Label/getLabel
+  //  * Returns the label document for the given user and transaction.
+  //  */
+  // async getStagedLabels(request: GetStagedLabelsRequest): Promise<StagedLabel[]> {
+  //   return apiClient.post<GetStagedLabelsRequest, StagedLabel[]>('/Label/getStagedLabels', request)
+  // },
+  // async getLabel(request: GetLabelRequest): Promise<Label[]> {
+  //   return apiClient.post<GetLabelRequest, Label[]>('/Label/getLabel', request)
+  // },
 
   // /**
   //  * POST /api/Label/getCategoryHistory
