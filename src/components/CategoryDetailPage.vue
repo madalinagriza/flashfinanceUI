@@ -353,8 +353,6 @@ const confirmMove = async () => {
   const destinationId = moveState.targetCategoryId
 
   try {
-    await labelApi.update({ session, tx_id: txId, new_category_id: destinationId })
-
     await categoryApi.updateTransaction({
       session,
       tx_id: txId,
