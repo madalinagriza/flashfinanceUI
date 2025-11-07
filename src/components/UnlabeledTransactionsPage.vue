@@ -18,24 +18,16 @@ const error = ref<string | null>(null)
 const retriedOnce = ref(false)
 const showDebug = ref(false)
 
-// Safely extract a string user id from various shapes (matches Categories page logic)
-const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
+// Safely extract a session id from various shapes (matches other views)
+const extractSessionId = (u: unknown): string | null => normalizeId((u as any)?.session ?? u)
 
-const userId = computed(() => extractUserId(props.user))
+const sessionId = computed(() => extractSessionId(props.user))
 
-// Normalize various server shapes for owner_id to a string
-const extractOwnerId = (value: unknown): string => normalizeId(value) ?? ''
-
-// Guard against server-side filtering mistakes: only show items owned by this user
-const displayedTransactions = computed(() => {
-  const uid = userId.value
-  if (!uid) return []
-  return transactions.value.filter(t => extractOwnerId((t as any).owner_id) === uid)
-})
+const displayedTransactions = computed(() => transactions.value)
 
 const fetchUnlabeledTransactions = async () => {
-  const currentUserId = userId.value
-  if (!currentUserId) {
+  const currentSession = sessionId.value
+  if (!currentSession) {
     error.value = 'User not signed in.'
     return
   }
@@ -43,21 +35,12 @@ const fetchUnlabeledTransactions = async () => {
   loading.value = true
   error.value = null
   try {
-    const resp = await transactionApi.getUnlabeledTransactions({ owner_id: currentUserId })
+    const resp = await transactionApi.getUnlabeledTransactions({ session: currentSession })
     const arr = Array.isArray(resp) ? resp : []
-    // Diagnostics before normalization
-    const rawOwners = [...new Set(arr.map((t: any) => t?.owner_id))].slice(0, 5)
-    // Normalize owner_id to a string for consistent client behavior
-    transactions.value = arr.map((t: any) => ({
-      ...t,
-      owner_id: extractOwnerId(t?.owner_id),
-    })) as Transaction[]
-    const owners = [...new Set(transactions.value.map(t => t.owner_id))].slice(0, 5)
+    transactions.value = arr as Transaction[]
     console.debug('Unlabeled fetch:', {
-      requested_owner_id: currentUserId,
+      requested_session: currentSession,
       total: transactions.value.length,
-      owners_sample_normalized: owners,
-      owners_sample_raw: rawOwners,
     })
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load unlabeled transactions.'

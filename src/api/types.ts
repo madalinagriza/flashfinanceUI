@@ -2,10 +2,10 @@
 
 // ===== User Types =====
 export interface User {
-  user_id: string
+  user_id: string | null
   username: string
   status?: 'ACTIVE' | 'INACTIVE'
-  session?: string
+  session: string | null
 }
 
 export interface RegisterRequest {
@@ -23,7 +23,7 @@ export interface AuthenticateRequest {
 // }
 
 export interface ChangePasswordRequest {
-  user: string
+  session: string
   oldPassword: string
   newPassword: string
 }
@@ -52,7 +52,7 @@ export interface LogoutResponse {
 // ===== Transaction Types =====
 export interface Transaction {
   tx_id: string
-  owner_id: string
+  owner_id?: string | null
   date: string
   merchant_text: string
   amount: number
@@ -60,77 +60,76 @@ export interface Transaction {
 }
 
 export interface ImportTransactionsRequest {
-  owner_id: string
+  session: string
   fileContent: string
 }
 
 export interface MarkLabeledRequest {
   tx_id: string
-  requester_id: string
+  session: string
 }
 
 export interface GetTransactionRequest {
-  owner_id: string
+  session: string
   tx_id: string
 }
 
 export interface GetUnlabeledTransactionsRequest {
-  owner_id: string
+  session: string
 }
 
 export interface GetTxInfoRequest {
-  owner_id: string
+  session: string
   tx_id: string
 }
 
 export interface TransactionInfoResponse {
-  date?: string
-  merchant_text?: string
-  amount?: number
-  tx_name?: string
-  tx_merchant?: string
+  date: Date | null
+  merchant_text: string
+  amount: number
 }
 
 // ===== Category Types =====
 export interface Category {
   category_id: string
-  owner_id: string
+  owner_id?: string | null
   name: string
 }
 
 export interface CategoryNameOwner {
   category_id: string
   name: string
-  owner_id: string
+  owner_id?: string | null
 }
 
 export interface CreateCategoryRequest {
-  owner_id: string
+  session: string
   name: string
 }
 
 export interface RenameCategoryRequest {
-  owner_id: string
+  session: string
   category_id: string
   new_name: string
 }
 
 export interface DeleteCategoryRequest {
-  owner_id: string
+  session: string
   category_id: string
-  can_delete: boolean
 }
 
 export interface GetCategoriesFromOwnerRequest {
-  owner_id: string
+  session: string
 }
 
 export interface OwnerCategoryId {
   category_id: string
+  name?: string | null
+  owner_id?: string | null
 }
 
 export interface GetCategoryNameByIdRequest {
-  owner_id: string
+  session: string
   category_id: string
 }
 
@@ -139,7 +138,7 @@ export interface CategoryNameResponse {
 }
 
 export interface AddCategoryTransactionRequest {
-  owner_id: string
+  session: string
   category_id: string
   tx_id: string
   amount: number
@@ -147,33 +146,35 @@ export interface AddCategoryTransactionRequest {
 }
 
 export interface RemoveCategoryTransactionRequest {
-  owner_id: string
+  session: string
   category_id: string
   tx_id: string
 }
 
 export interface UpdateCategoryTransactionRequest {
-  owner_id: string
+  session: string
   tx_id: string
   old_category_id: string
   new_category_id: string
 }
 
 export interface MoveTransactionToTrashRequest {
-  owner_id: string
+  session: string
   from_category_id: string
   tx_id: string
 }
 
 export interface ListCategoryTransactionsRequest {
-  owner_id: string
+  session: string
   category_id: string
+  category_name?: string
 }
 
 export interface CategoryTransactionEntry {
   tx_id: string
   amount: number
   tx_date: string
+  category_name?: string | null
 }
 
 export interface CategoryMetricPeriod {
@@ -182,7 +183,7 @@ export interface CategoryMetricPeriod {
 }
 
 export interface GetCategoryMetricStatsRequest {
-  owner_id: string
+  session: string
   category_id: string
   period: CategoryMetricPeriod
 }
@@ -206,7 +207,7 @@ export interface Label {
 }
 
 export interface StageLabelRequest {
-  user_id: string
+  session: string
   tx_id: string
   tx_name: string
   tx_merchant: string
@@ -214,33 +215,33 @@ export interface StageLabelRequest {
 }
 
 export interface FinalizeLabelRequest {
-  user_id: string
+  session: string
 }
 
 export interface CancelLabelRequest {
-  user_id: string
+  session: string
 }
 
 export interface UpdateLabelRequest {
-  user_id: string
+  session: string
   tx_id: string
   new_category_id: string
 }
 
 export interface RemoveLabelRequest {
-  user_id: string
+  session: string
   tx_id: string
 }
 
 export interface DiscardLabelRequest {
-  user_id: string
+  session: string
   tx_id: string
   tx_name: string
   tx_merchant: string
 }
 
 export interface GetLabelRequest {
-  user_id: string
+  session: string
   tx_id: string
 }
 
@@ -250,12 +251,12 @@ export interface GetLabelRequest {
 // }
 
 export interface HasLabelsForCategoryRequest {
-  user_id: string
+  session: string
   category_id: string
 }
 
 export interface GetStagedLabelsRequest {
-  user_id: string
+  session: string
 }
 
 export interface StagedLabel {
@@ -294,12 +295,12 @@ export interface HasLabelsResponse {
 }
 
 export interface ListLabelsRequest {
-  user_id: string
+  session: string
 }
 
 export interface SuggestLabelRequest {
-  user_id: string
-  allCategories: [string, string][]
+  session: string
+  allCategories?: [string, string][]
   txInfo: {
     tx_id: string
     tx_name: string

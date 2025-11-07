@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { userApi } from '../api'
 import type { User } from '../api'
+import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
   user: User | null
@@ -50,14 +51,25 @@ watch(
   { immediate: true },
 )
 
-// Load persisted suggest-AI preference for the current account when user changes
+const currentSessionId = computed(() => normalizeId(accountUser.value?.session))
+const currentUserId = computed(() => normalizeId(accountUser.value?.user_id))
+
+// Load persisted suggest-AI preference for the current account when session changes
 watch(
-  () => accountUser.value?.user_id,
-  (uid) => {
-    if (!uid) return
+  () => currentSessionId.value,
+  (session) => {
+    const uid = currentUserId.value
+    if (!session && !uid) return
     try {
-      const key = `suggestAi_${uid}`
-      const raw = localStorage.getItem(key)
+      const sessionKey = session ? `suggestAi_${session}` : null
+      const legacyKey = uid ? `suggestAi_${uid}` : null
+      let raw: string | null = null
+      if (sessionKey) {
+        raw = localStorage.getItem(sessionKey)
+      }
+      if (raw == null && legacyKey && legacyKey !== sessionKey) {
+        raw = localStorage.getItem(legacyKey)
+      }
       // default to true if not set (preserve existing behavior)
       suggestPref.enabled = raw == null ? true : raw === 'true'
       suggestPref.message = null
@@ -70,11 +82,19 @@ watch(
 )
 
 const toggleSuggestPref = () => {
-  const uid = accountUser.value?.user_id
-  if (!uid) return
+  const session = currentSessionId.value
+  const uid = currentUserId.value
+  const key = session ? `suggestAi_${session}` : uid ? `suggestAi_${uid}` : null
+  if (!key) return
   try {
-    const key = `suggestAi_${uid}`
     localStorage.setItem(key, suggestPref.enabled ? 'true' : 'false')
+    // Clean up legacy key if we now operate under a session-specific preference
+    if (session && uid) {
+      const legacyKey = `suggestAi_${uid}`
+      if (legacyKey !== key) {
+        localStorage.removeItem(legacyKey)
+      }
+    }
     suggestPref.message = suggestPref.enabled ? 'AI suggestions enabled.' : 'AI suggestions disabled.'
     setTimeout(() => (suggestPref.message = null), 2500)
   } catch (e) {
@@ -154,6 +174,12 @@ const handleChangePassword = async () => {
     return
   }
 
+  const sessionId = currentSessionId.value ?? ''
+  if (!sessionId) {
+    passwordState.error = 'Account session not available. Please sign in again.'
+    return
+  }
+
   if (!validatePasswordForm()) {
     return
   }
@@ -162,7 +188,7 @@ const handleChangePassword = async () => {
 
   try {
     await userApi.changePassword({
-      user: accountUser.value.user_id,
+      session: sessionId,
       oldPassword: passwordForm.oldPassword,
       newPassword: passwordForm.newPassword,
     })

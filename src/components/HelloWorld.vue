@@ -55,7 +55,7 @@ const fetchUsers = async () => {
       <div v-if="users.length > 0" style="margin-top: 1rem;">
         <h4>Users ({{ users.length }}):</h4>
         <ul style="text-align: left;">
-          <li v-for="user in users" :key="user.user_id">
+          <li v-for="user in users" :key="user.user_id ?? user.username">
             <strong>{{ user.username }}</strong>
             <span class="id-hidden">· Account identifier hidden</span>
           </li>

@@ -13,6 +13,7 @@ import type {
   LogoutRequest,
   LogoutResponse,
 } from './types'
+import { normalizeId } from '../utils/normalize'
 
 export const userApi = {
   /**
@@ -25,25 +26,27 @@ export const userApi = {
       request
     )
 
+    const normalizedId = normalizeId(response.user)
+    if (!normalizedId) {
+      console.error('userApi.register: failed to resolve user id from response', response)
+      throw new Error('Registration failed: invalid user id returned by server')
+    }
+
     return {
-      user_id: response.user,
+      user_id: normalizedId,
       username: request.username,
       status: 'ACTIVE',
+      session: null,
     }
   },
 
   /**
-   * POST /api/UserAuthentication/login
-   * Authenticates a user with their username and password.
+   * POST /login
+   * Authenticates a user and returns a session identifier.
    */
   async authenticate(request: AuthenticateRequest): Promise<User> {
-    const response = await apiClient.post<AuthenticateRequest, UserAuthenticationResponse>(
-      '/UserAuthentication/login',
-      request
-    )
-
-    let sessionId: string | undefined
-    const loginEndpoints = ['/login', '/Login']
+    const loginEndpoints = ['/login']
+    let sessionId: string | null = null
 
     for (const endpoint of loginEndpoints) {
       try {
@@ -60,11 +63,11 @@ export const userApi = {
     }
 
     if (!sessionId) {
-      console.warn('userApi.authenticate: proceeding without session — /login endpoints unavailable')
+      throw new Error('Authentication failed: invalid username or password')
     }
 
     return {
-      user_id: response.user,
+      user_id: null,
       username: request.username,
       status: 'ACTIVE',
       session: sessionId,

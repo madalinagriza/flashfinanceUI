@@ -85,16 +85,44 @@ export const categoryApi = {
    * POST /api/Category/getCategoriesFromOwner
    * Returns the list of category ids for the specified owner.
    */
-  async getCategoriesFromOwner(owner_id: string): Promise<OwnerCategoryId[]> {
-    const raw = await apiClient.post<GetCategoriesFromOwnerRequest, any[]>(
+  async getCategoriesFromOwner(session: string): Promise<OwnerCategoryId[]> {
+    const response = await apiClient.post<GetCategoriesFromOwnerRequest, unknown>(
       '/Category/getCategoriesFromOwner',
-      { owner_id }
+      { session }
     )
 
-    return (raw || [])
+    const resolveEntries = (value: unknown): any[] => {
+      if (Array.isArray(value)) {
+        return value
+      }
+      if (value && typeof value === 'object') {
+        const container = value as Record<string, unknown>
+        const preferred = container.results ?? container.data ?? container.value
+        if (Array.isArray(preferred)) {
+          return preferred
+        }
+      }
+      return []
+    }
+
+    const rawEntries = resolveEntries(response)
+
+    if (!Array.isArray(rawEntries)) {
+      console.warn('categoryApi.getCategoriesFromOwner: unexpected response shape', response)
+      return []
+    }
+
+    return rawEntries
       .map((entry: any) => {
         const categoryId = normalizeId(entry?.category_id) ?? normalizeId(entry?._id) ?? normalizeId(entry)
-        return categoryId ? ({ category_id: categoryId } as OwnerCategoryId) : null
+        if (!categoryId) return null
+        const ownerId = normalizeId(entry?.owner_id) ?? null
+        const name = normalizeString(entry?.name) ?? null
+        return {
+          category_id: categoryId,
+          owner_id: ownerId,
+          name,
+        } as OwnerCategoryId
       })
       .filter((entry): entry is OwnerCategoryId => entry !== null)
   },
@@ -132,14 +160,9 @@ export const categoryApi = {
    */
   async updateTransaction(request: UpdateCategoryTransactionRequest): Promise<OkResponse> {
     const primary = '/Category/updateTransaction'
-    const fallback = '/Category/update_transaction'
-
-    try {
+    
       return await apiClient.post<UpdateCategoryTransactionRequest, OkResponse>(primary, request)
-    } catch (err: any) {
-      console.warn(`categoryApi.updateTransaction primary ${primary} failed (${String(err?.message)}), trying fallback ${fallback}`)
-      return await apiClient.post<UpdateCategoryTransactionRequest, OkResponse>(fallback, request)
-    }
+   
   },
 
   /**
@@ -154,28 +177,37 @@ export const categoryApi = {
    * Helper that combines getCategoriesFromOwner and getCategoryNameById to produce
    * full category records for the provided owner.
    */
-  async getCategoriesWithNames(owner_id: string): Promise<CategoryNameOwner[]> {
-    const idEntries = await this.getCategoriesFromOwner(owner_id)
+  async getCategoriesWithNames(session: string): Promise<CategoryNameOwner[]> {
+    const idEntries = await this.getCategoriesFromOwner(session)
     if (!Array.isArray(idEntries) || idEntries.length === 0) return []
 
     const categories = await Promise.all(
-      idEntries.map(async ({ category_id }) => {
-        const normalizedId = normalizeId(category_id)
+      idEntries.map(async (entry) => {
+        const normalizedId = normalizeId(entry.category_id)
         if (!normalizedId) return null
+
+        const existingName = normalizeString((entry as any)?.name)
+        if (existingName) {
+          return {
+            category_id: normalizedId,
+            name: existingName,
+            owner_id: normalizeId((entry as any)?.owner_id) ?? undefined,
+          } as CategoryNameOwner
+        }
         try {
-          const response = await this.getCategoryNameById({ owner_id, category_id: normalizedId })
+          const response = await this.getCategoryNameById({ session, category_id: normalizedId })
           const resolvedName = normalizeString(response) ?? normalizeString((response as any)?.name) ?? normalizedId
           return {
             category_id: normalizedId,
             name: resolvedName || normalizedId,
-            owner_id,
+            owner_id: normalizeId((entry as any)?.owner_id) ?? undefined,
           } as CategoryNameOwner
         } catch (err) {
           console.error('getCategoriesWithNames: failed to resolve name', normalizedId, err)
           return {
             category_id: normalizedId,
             name: normalizedId,
-            owner_id,
+            owner_id: normalizeId((entry as any)?.owner_id) ?? undefined,
           } as CategoryNameOwner
         }
       })
@@ -185,8 +217,103 @@ export const categoryApi = {
   },
 
   async listTransactions(payload: ListCategoryTransactionsRequest): Promise<CategoryTransactionEntry[]> {
-    const res = await apiClient.post('/Category/listTransactions', payload)
-    return Array.isArray(res) ? (res as CategoryTransactionEntry[]) : []
+    const response = await apiClient.post<ListCategoryTransactionsRequest, unknown>(
+      '/Category/listTransactions',
+      payload
+    )
+
+    const fallbackCategoryName = normalizeString((payload as any)?.category_name) ?? null
+
+    const toArray = (value: unknown): unknown[] => {
+      if (Array.isArray(value)) {
+        return value
+      }
+      if (value && typeof value === 'object') {
+        const container = value as Record<string, unknown>
+        const nested = container.results ?? container.data ?? container.transactions ?? container.items
+        if (Array.isArray(nested)) {
+          return nested
+        }
+        if (nested && typeof nested === 'object') {
+          return [nested]
+        }
+      }
+      return value == null ? [] : [value]
+    }
+
+    const parseAmount = (raw: unknown): number => {
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        return raw
+      }
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim()
+        if (trimmed) {
+          const parsed = Number(trimmed)
+          if (Number.isFinite(parsed)) {
+            return parsed
+          }
+        }
+      }
+      return 0
+    }
+
+    const parseDate = (raw: unknown): string => {
+      if (raw == null) {
+        return ''
+      }
+      if (typeof raw === 'string') {
+        return raw
+      }
+      if (raw instanceof Date) {
+        return raw.toISOString()
+      }
+      const coerced = new Date(String(raw))
+      return Number.isNaN(coerced.getTime()) ? '' : coerced.toISOString()
+    }
+
+    const normalizeEntry = (entry: unknown): CategoryTransactionEntry | null => {
+      if (!entry) return null
+      const record =
+        entry && typeof entry === 'object' && 'tx' in (entry as Record<string, unknown>)
+          ? ((entry as Record<string, unknown>).tx as Record<string, unknown>)
+          : (entry as Record<string, unknown> | null)
+
+      if (!record) return null
+
+      const txId = normalizeId(
+        record.tx_id ?? record.txId ?? record.id ?? record._id ?? (entry as any)?.tx_id
+      )
+      if (!txId) {
+        return null
+      }
+
+      const amount = parseAmount(record.amount ?? record.tx_amount ?? record.total)
+      const dateRaw = record.tx_date ?? record.date ?? record.transaction_date
+      const categoryName = normalizeString(
+        record.category_name ??
+          record.category ??
+          record.name ??
+          (entry as any)?.category_name ??
+          fallbackCategoryName
+      )
+
+      return {
+        tx_id: txId,
+        amount,
+        tx_date: parseDate(dateRaw),
+        category_name: categoryName,
+      }
+    }
+
+    const normalized = toArray(response)
+      .map(normalizeEntry)
+      .filter((entry): entry is CategoryTransactionEntry => entry !== null)
+
+    if (normalized.length === 0 && Array.isArray(response) && response.length > 0) {
+      console.warn('categoryApi.listTransactions: failed to normalize response entries', response)
+    }
+
+    return normalized
   },
 
   async getMetricStats(payload: GetCategoryMetricStatsRequest): Promise<CategoryMetricStatsResponse> {
@@ -244,17 +371,38 @@ export const categoryApi = {
     const normalizedList: CategoryMetricStatsResponse = []
 
     const pushNormalized = (candidate: unknown) => {
-      const normalized = normalizeMetrics(candidate)
+      let effective = candidate
+      if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+        const container = candidate as Record<string, unknown>
+        if (container.stats) {
+          effective = container.stats
+        }
+      }
+
+      const normalized = normalizeMetrics(effective)
       if (normalized) {
         normalizedList.push(normalized)
       }
     }
 
-    if (Array.isArray(res)) {
-      res.forEach(pushNormalized)
-    } else {
-      pushNormalized(res)
+    const resolveEntries = (value: unknown): unknown[] => {
+      if (Array.isArray(value)) {
+        return value
+      }
+      if (value && typeof value === 'object') {
+        const container = value as Record<string, unknown>
+        const nested = container.results ?? container.data ?? container.value ?? container.metrics
+        if (Array.isArray(nested)) {
+          return nested
+        }
+        if (nested && typeof nested === 'object') {
+          return [nested]
+        }
+      }
+      return value == null ? [] : [value]
     }
+
+    resolveEntries(res).forEach(pushNormalized)
 
     if (normalizedList.length === 0) {
       console.warn('getMetricStats: response without usable metrics entries', res)

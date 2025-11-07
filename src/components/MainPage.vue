@@ -23,11 +23,11 @@ const unlabeledError = ref<string | null>('Sign in to view your queue.')
 
 const lastImportMeta = ref<{ timestamp: string; count: number } | null>(null)
 
-const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
+const extractSessionId = (u: unknown): string | null => normalizeId((u as any)?.session ?? u)
 
-const userId = computed(() => extractUserId(props.user))
+const sessionId = computed(() => extractSessionId(props.user))
 
-const importStorageKey = computed(() => (userId.value ? `ff:last-import:${userId.value}` : null))
+const importStorageKey = computed(() => (sessionId.value ? `ff:last-import:${sessionId.value}` : null))
 
 const CATEGORY_PREVIEW_LIMIT = 6
 
@@ -89,8 +89,8 @@ const hydrateLastImport = () => {
 }
 
 const fetchCategories = async () => {
-  const ownerId = userId.value
-  if (!ownerId) {
+  const session = sessionId.value
+  if (!session) {
     categories.value = []
     categoriesError.value = 'Sign in to see your categories.'
     return
@@ -99,7 +99,7 @@ const fetchCategories = async () => {
   categoriesLoading.value = true
   categoriesError.value = null
   try {
-    categories.value = await categoryApi.getCategoriesWithNames(ownerId)
+    categories.value = await categoryApi.getCategoriesWithNames(session)
   } catch (err) {
     categoriesError.value = err instanceof Error ? err.message : 'Unable to load categories.'
     console.error('Dashboard categories fetch error:', err)
@@ -109,8 +109,8 @@ const fetchCategories = async () => {
 }
 
 const fetchUnlabeled = async () => {
-  const ownerId = userId.value
-  if (!ownerId) {
+  const session = sessionId.value
+  if (!session) {
     unlabeledTransactions.value = []
     unlabeledError.value = 'Sign in to view your queue.'
     return
@@ -119,7 +119,7 @@ const fetchUnlabeled = async () => {
   unlabeledLoading.value = true
   unlabeledError.value = null
   try {
-    const resp = await transactionApi.getUnlabeledTransactions({ owner_id: ownerId })
+    const resp = await transactionApi.getUnlabeledTransactions({ session })
     unlabeledTransactions.value = Array.isArray(resp) ? resp : []
   } catch (err) {
     unlabeledError.value = err instanceof Error ? err.message : 'Unable to load unlabeled transactions.'
@@ -137,13 +137,13 @@ const storageListener = (event: StorageEvent) => {
 }
 
 const refreshDashboardData = () => {
-  if (!userId.value) return
+  if (!sessionId.value) return
   fetchCategories()
   fetchUnlabeled()
   hydrateLastImport()
 }
 
-watch(userId, (next, prev) => {
+watch(sessionId, (next, prev) => {
   if (next === prev) return
   if (!next) {
     categories.value = []

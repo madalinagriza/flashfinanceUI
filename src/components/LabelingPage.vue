@@ -19,11 +19,20 @@
           >
             Next
           </button>
+            <button
+              type="button"
+              class="action-button ghost header-cancel"
+              @click="cancelLabelingSession"
+              :disabled="cancelLoading || finalizeLoading || stageLoading"
+            >
+              <template v-if="cancelLoading">Canceling…</template>
+              <template v-else>Cancel session</template>
+            </button>
           <button
             type="button"
             class="action-button primary header-finalize"
             @click="finalizeLabeling"
-            :disabled="finalizeLoading || !userId || !currentTx"
+              :disabled="finalizeLoading || cancelLoading || !sessionId || !currentTx"
           >
             <template v-if="finalizeLoading">Finalizing…</template>
             <template v-else>
@@ -63,11 +72,11 @@
             <div class="category-header">
               <h2 class="ff-card-title">Select a category</h2>
               <button
-                v-if="!loading && !error && currentTx && userId"
+                v-if="!loading && !error && currentTx && sessionId"
                 type="button"
                 class="link-button danger"
                 @click="discardCurrentTx"
-                :disabled="stageLoading || finalizeLoading"
+                :disabled="stageLoading || finalizeLoading || cancelLoading"
               >
                 <span class="ff-icon" aria-hidden="true">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -127,13 +136,31 @@
                 class="category-chip"
                 :class="{ suggested: category.category_id === suggestedCategoryId }"
                 @click="stageCategory(category)"
-                :disabled="stageLoading"
+                :disabled="stageLoading || cancelLoading || finalizeLoading"
               >
                 {{ category.name }}
               </button>
             </div>
             <div v-else-if="!loading && !error && !suggestLoading" class="no-data">No categories found.</div>
-            <div v-if="finalizeError || finalizeMessage" class="finalize-status">
+            <div v-if="finalizeError || finalizeMessage || cancelError || cancelMessage" class="finalize-status">
+              <div v-if="cancelError" class="banner error">
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8" />
+                    <path d="M12.5 7.5L7.5 12.5M7.5 7.5l5 5" />
+                  </svg>
+                </span>
+                {{ cancelError }}
+              </div>
+              <div v-if="cancelMessage" class="banner success">
+                <span class="ff-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 11l3.5 3.5L15 8" />
+                    <circle cx="10" cy="10" r="8" />
+                  </svg>
+                </span>
+                {{ cancelMessage }}
+              </div>
               <div v-if="finalizeError" class="banner error">
                 <span class="ff-icon" aria-hidden="true">
                   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -208,13 +235,14 @@ const stageMessage = ref<string | null>(null);
 const finalizeLoading = ref(false);
 const finalizeError = ref<string | null>(null);
 const finalizeMessage = ref<string | null>(null);
+const cancelLoading = ref(false);
+const cancelError = ref<string | null>(null);
+const cancelMessage = ref<string | null>(null);
 const suggestedCategoryId = ref<string | null>(null);
 const suggestError = ref<string | null>(null);
 const suggestLoading = ref(false);
 // Track if the current transaction was staged in this session
 const wasStagedHere = ref(false);
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Session state: queue of unlabeled transactions and current pointer
 const sessionTransactions = ref<Transaction[]>([]);
@@ -225,15 +253,15 @@ const sessionStagedTxIds = ref<Set<string>>(new Set());
 const activeTx = ref<Transaction | null>(null);
 const currentTx = computed(() => activeTx.value ?? props.transaction);
 
-const extractUserId = (value: unknown): string | null => normalizeId((value as any)?.user_id ?? (value as any)?.id ?? value);
+const extractSessionId = (value: unknown): string | null => normalizeId((value as any)?.session ?? value);
 
-const userId = computed(() => extractUserId(props.user));
+const sessionId = computed(() => extractSessionId(props.user));
 
 // Check per-user preference (localStorage) for whether AI suggestions should be requested.
-const isSuggestEnabled = (uid: string | null): boolean => {
-  if (!uid) return false
+const isSuggestEnabled = (session: string | null): boolean => {
+  if (!session) return false
   try {
-    const raw = localStorage.getItem(`suggestAi_${uid}`)
+    const raw = localStorage.getItem(`suggestAi_${session}`)
     // default true if not set
     return raw == null ? true : raw === 'true'
   } catch (e) {
@@ -262,22 +290,18 @@ const extractTxId = (tx: unknown): string | null => {
   return null;
 };
 
-const visibleCategories = computed(() => {
-  const uid = userId.value;
-  if (!uid) return [];
-  return allCategories.value.filter(category => (category.owner_id || '') === uid);
-});
+const visibleCategories = computed(() => allCategories.value);
 
 const fetchCategories = async () => {
-  const uid = userId.value;
-  if (!uid) {
-    error.value = 'User not available for fetching categories.';
+  const session = sessionId.value;
+  if (!session) {
+    error.value = 'User session not available for fetching categories.';
     return;
   }
   loading.value = true;
   error.value = null;
   try {
-    const categories = await categoryApi.getCategoriesWithNames(uid);
+    const categories = await categoryApi.getCategoriesWithNames(session);
     allCategories.value = categories;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load categories.';
@@ -289,9 +313,9 @@ const fetchCategories = async () => {
 
 const fetchSuggestion = async () => {
   const tx = currentTx.value;
-  const uid = userId.value;
-  
-  if (!uid || !tx) return;
+  const session = sessionId.value;
+
+  if (!session || !tx) return;
   
   suggestedCategoryId.value = null;
   suggestError.value = null;
@@ -300,21 +324,9 @@ const fetchSuggestion = async () => {
     const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${tx.tx_id}`;
     const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
 
-    // Build the allCategories tuple list [name, id] for this user
-    const categoryPairs: [string, string][] = visibleCategories.value
-      .filter(c => !!c.category_id && !!c.name)
-      .map(c => [c.name, c.category_id!]);
-
-    if (categoryPairs.length === 0) {
-      // Per spec, allCategories must be non-empty; skip calling suggest
-      suggestError.value = 'No categories available to suggest.';
-      return;
-    }
-
     suggestLoading.value = true;
     const suggestPayload = {
-      user_id: uid,
-      allCategories: categoryPairs,
+      session,
       txInfo: {
         tx_id: tx.tx_id,
         tx_name: txName,
@@ -322,7 +334,7 @@ const fetchSuggestion = async () => {
       },
     } as const;
 
-    console.debug('Calling /api/Label/suggest with payload:', suggestPayload);
+  console.debug('Calling /api/Label/suggest with payload:', suggestPayload);
 
     const suggestion = await labelApi.suggest(suggestPayload);
 
@@ -331,11 +343,11 @@ const fetchSuggestion = async () => {
     const resolvedId = normalizeId((suggestion as any)?.id ?? (suggestion as any)?.category_id ?? suggestion) ?? null;
     const matchFound = !!resolvedId && visibleCategories.value.some(cat => cat.category_id === resolvedId);
 
-    if (resolvedId) {
+    if (resolvedId && matchFound) {
       suggestedCategoryId.value = resolvedId;
-      if (!matchFound) {
-        suggestError.value = 'Suggestion refers to a category that is not in your list.';
-      }
+    } else if (resolvedId && !matchFound) {
+      // Backend may suggest categories outside the current visible list; surface info to the user.
+      suggestError.value = 'Suggestion refers to a category outside your current list.';
     } else {
       suggestError.value = 'Suggestion response missing a valid category id.';
     }
@@ -349,14 +361,14 @@ const fetchSuggestion = async () => {
 
 const stageCategory = async (category: CategoryNameOwner) => {
   const tx = currentTx.value;
-  const uid = userId.value;
+  const session = sessionId.value;
 
-  if (stageLoading.value) {
+  if (stageLoading.value || cancelLoading.value || finalizeLoading.value) {
     return;
   }
 
-  if (!uid || !tx) {
-    stageError.value = 'Missing user or transaction for staging.';
+  if (!session || !tx) {
+    stageError.value = 'Missing user session or transaction for staging.';
     return;
   }
 
@@ -379,8 +391,8 @@ const stageCategory = async (category: CategoryNameOwner) => {
     const txName = (tx as unknown as { tx_name?: string }).tx_name ?? tx.merchant_text ?? `Transaction ${txId}`;
     const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
 
-    const response = await labelApi.stage({
-      user_id: uid,
+    await labelApi.stage({
+      session,
       tx_id: txId,
       tx_name: txName,
       tx_merchant: txMerchant,
@@ -402,12 +414,12 @@ const stageCategory = async (category: CategoryNameOwner) => {
 
 const finalizeLabeling = async () => {
   const tx = currentTx.value;
-  const uid = userId.value;
+  const session = sessionId.value;
 
-  if (finalizeLoading.value) return;
+  if (finalizeLoading.value || cancelLoading.value) return;
 
-  if (!uid) {
-    finalizeError.value = 'User not available to finalize.';
+  if (!session) {
+    finalizeError.value = 'User session not available to finalize.';
     return;
   }
 
@@ -421,82 +433,27 @@ const finalizeLabeling = async () => {
   finalizeMessage.value = null;
 
   try {
-    let stagedPairs: Array<{ txId: string; categoryId: string }> = [];
-    let stagedIds: string[] = [];
+    let stagedCount = 0;
     try {
-      const stagedResponse = await labelApi.getStagedLabels({ user_id: uid });
-      const stagedList = Array.isArray(stagedResponse) ? (stagedResponse as StagedLabel[]) : [];
-      stagedPairs = stagedList
-        .map((entry) => {
-          if (!entry) return null;
-          const txId = resolveTxIdValue((entry as any).tx_id);
-          const categoryId = resolveTxIdValue((entry as any).category_id);
-          return txId && categoryId ? { txId, categoryId } : null;
-        })
-        .filter((pair): pair is { txId: string; categoryId: string } => pair !== null);
-      stagedIds = stagedPairs.map((pair) => pair.txId);
+      const stagedResponse = await labelApi.getStagedLabels({ session });
+      stagedCount = Array.isArray(stagedResponse) ? stagedResponse.length : 0;
     } catch (fetchErr) {
       console.error('Failed to fetch staged labels before finalize', fetchErr);
     }
 
-    // Fallback to locally tracked staged ids if server returned none
-    if (stagedIds.length === 0 && sessionStagedTxIds.value.size > 0) {
-      stagedIds = Array.from(sessionStagedTxIds.value);
+    if (stagedCount === 0 && sessionStagedTxIds.value.size > 0) {
+      stagedCount = sessionStagedTxIds.value.size;
     }
 
-    // Deduplicate IDs to avoid double-marking
-    const uniqueIds = Array.from(new Set(stagedIds));
-    for (const sId of uniqueIds) {
-      try {
-        await transactionApi.markLabeled({ tx_id: sId, requester_id: uid });
-      } catch (e) {
-        console.warn('Failed to mark labeled for tx', sId, e);
-      }
-    }
+    // Finalize all staged labels (server now handles marking and metric updates internally)
+  await labelApi.finalize({ session });
 
-    // Finalize all staged labels (commits to permanent labels)
-    await labelApi.finalize({ user_id: uid });
-
-    // Update category metrics for each staged tx/category pair
-    if (stagedPairs.length > 0) {
-      const uniquePairs = new Map<string, string>();
-      stagedPairs.forEach(({ txId, categoryId }) => {
-        if (!uniquePairs.has(txId)) {
-          uniquePairs.set(txId, categoryId);
-        }
-      });
-
-      const addTransactionsPromises = Array.from(uniquePairs.entries()).map(async ([txId, categoryId]) => {
-        try {
-          const txInfo = await transactionApi.getTxInfo({ owner_id: uid, tx_id: txId });
-          const amount = typeof txInfo?.amount === 'number' && Number.isFinite(txInfo.amount)
-            ? txInfo.amount
-            : Number(txInfo?.amount ?? 0) || 0;
-          const txDate = typeof txInfo?.date === 'string' && txInfo.date.length > 0
-            ? txInfo.date
-            : new Date().toISOString();
-
-          await categoryApi.addTransaction({
-            owner_id: uid,
-            category_id: categoryId,
-            tx_id: txId,
-            amount,
-            tx_date: txDate,
-          });
-        } catch (catErr) {
-          console.warn('Failed to add transaction to category metrics', { txId, categoryId }, catErr);
-        }
-      });
-
-      if (addTransactionsPromises.length > 0) {
-        await Promise.allSettled(addTransactionsPromises);
-      }
-    }
+    // Transaction/mark_labeled and Category/addTransaction are now handled by finalize on the server.
 
     sessionStagedTxIds.value.clear();
 
-    finalizeMessage.value = uniqueIds.length > 0
-      ? `Finalized ${uniqueIds.length} labeled transaction(s).`
+    finalizeMessage.value = stagedCount > 0
+      ? `Finalized ${stagedCount} labeled transaction(s).`
       : 'No transactions were staged; nothing to finalize.';
     
     // Navigate back to unlabeled list after brief delay
@@ -511,13 +468,46 @@ const finalizeLabeling = async () => {
   }
 };
 
+const cancelLabelingSession = async () => {
+  const session = sessionId.value;
+
+  if (cancelLoading.value) return;
+
+  if (!session) {
+    cancelError.value = 'User session not available to cancel.';
+    return;
+  }
+
+  const confirmed = window.confirm('Cancel labeling session? Staged labels will be discarded.');
+  if (!confirmed) return;
+
+  cancelLoading.value = true;
+  cancelError.value = null;
+  cancelMessage.value = null;
+
+  try {
+    await labelApi.cancel({ session });
+    sessionStagedTxIds.value.clear();
+    sessionTransactions.value = [];
+    sessionIndex.value = 0;
+    activeTx.value = null;
+    cancelMessage.value = 'Labeling session canceled.';
+    emit('navigate', 'unlabeled');
+  } catch (err) {
+    cancelError.value = err instanceof Error ? err.message : 'Failed to cancel labeling session.';
+    console.error('Cancel labeling session error:', err);
+  } finally {
+    cancelLoading.value = false;
+  }
+};
+
 const discardCurrentTx = async () => {
   const tx = currentTx.value;
-  const uid = userId.value;
+  const session = sessionId.value;
 
-  if (stageLoading.value || finalizeLoading.value) return;
-  if (!uid || !tx) {
-    stageError.value = 'Missing user or transaction for discard.';
+  if (stageLoading.value || finalizeLoading.value || cancelLoading.value) return;
+  if (!session || !tx) {
+    stageError.value = 'Missing user session or transaction for discard.';
     return;
   }
 
@@ -536,7 +526,7 @@ const discardCurrentTx = async () => {
     const txMerchant = (tx as unknown as { tx_merchant?: string }).tx_merchant ?? tx.merchant_text ?? 'Unknown merchant';
 
     const payload: DiscardLabelRequest = {
-      user_id: uid,
+      session,
       tx_id: txId,
       tx_name: txName,
       tx_merchant: txMerchant,
@@ -563,16 +553,12 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-// Normalize various server shapes for owner_id to a string (copied from Unlabeled page)
-const extractOwnerId = (value: unknown): string => normalizeId(value) ?? ''
-
 const fetchSessionTransactions = async () => {
-  const uid = userId.value
-  if (!uid) return
+  const session = sessionId.value
+  if (!session) return
   try {
-    const resp = await transactionApi.getUnlabeledTransactions({ owner_id: uid })
+    const resp = await transactionApi.getUnlabeledTransactions({ session })
     const arr = Array.isArray(resp) ? resp : []
-    // Filter to only current user and keep order
     sessionTransactions.value = arr
       .map((t: any) => {
         const normalizedId = extractTxId(t)
@@ -580,12 +566,10 @@ const fetchSessionTransactions = async () => {
         return {
           ...t,
           tx_id: normalizedId,
-          owner_id: extractOwnerId(t?.owner_id),
         } as Transaction
       })
       .filter((item): item is Transaction => {
-        if (!item) return false
-        return item.owner_id === uid
+        return item != null
       })
   } catch (e) {
     console.error('Failed to fetch session transactions', e)
@@ -605,14 +589,14 @@ onMounted(async () => {
   }
   activeTx.value = sessionTransactions.value[sessionIndex.value] ?? props.transaction ?? null
   // Ensure categories are loaded before requesting a suggestion (spec requires non-empty categories)
-  if (isSuggestEnabled(userId.value)) {
+  if (isSuggestEnabled(sessionId.value)) {
     await fetchSuggestion();
   } else {
     // Clear any previous suggestion state if suggestions are disabled
     suggestedCategoryId.value = null
     suggestError.value = null
     suggestLoading.value = false
-    console.debug('AI suggestions are disabled for user', userId.value)
+    console.debug('AI suggestions are disabled for session', sessionId.value)
   }
 });
 
@@ -623,17 +607,19 @@ watch(
     stageError.value = null;
     finalizeMessage.value = null;
     finalizeError.value = null;
+    cancelMessage.value = null;
+    cancelError.value = null;
     suggestedCategoryId.value = null;
     suggestError.value = null;
     wasStagedHere.value = false;
     // Only attempt suggestions if enabled for this user
-    if (isSuggestEnabled(userId.value)) {
+    if (isSuggestEnabled(sessionId.value)) {
       fetchSuggestion();
     } else {
       suggestedCategoryId.value = null;
       suggestError.value = null;
       suggestLoading.value = false;
-      console.debug('Skipping suggestion because user preference disabled', userId.value);
+      console.debug('Skipping suggestion because user preference disabled', sessionId.value);
     }
   }
 );

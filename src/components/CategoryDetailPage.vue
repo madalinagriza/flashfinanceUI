@@ -46,9 +46,6 @@ const markMetricsDisabled = () => {
   metricsRaw.value = 'Metrics disabled for Trash category.'
 }
 
-const DEFAULT_METRICS_END = '2025-10-30'
-const DEFAULT_METRICS_START = '2024-10-30'
-
 const metricsStartDate = ref('')
 const metricsEndDate = ref('')
 const EMPTY_METRICS: CategoryMetricStats = {
@@ -58,9 +55,28 @@ const EMPTY_METRICS: CategoryMetricStats = {
   days: 0,
 }
 
+const formatDateInput = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const computeLastNDaysRange = (days: number) => {
+  const end = new Date()
+  const start = new Date(end)
+  start.setDate(end.getDate() - Math.max(days - 1, 0))
+
+  return {
+    start: formatDateInput(start),
+    end: formatDateInput(end),
+  }
+}
+
 const initializeMetricsPeriod = () => {
-  metricsStartDate.value = DEFAULT_METRICS_START
-  metricsEndDate.value = DEFAULT_METRICS_END
+  const { start, end } = computeLastNDaysRange(10)
+  metricsStartDate.value = start
+  metricsEndDate.value = end
   metricsFilterError.value = null
 }
 
@@ -98,7 +114,7 @@ const categoryDeleteState = reactive({
   message: null as string | null,
 })
 
-const ownerId = computed(() => normalizeId(props.category?.owner_id ?? props.user?.user_id) ?? null)
+const sessionId = computed(() => normalizeId(props.user?.session) ?? null)
 const categoryId = computed(() => normalizeId(props.category?.category_id) ?? null)
 const rawCategoryName = computed(() => props.category?.name ?? '')
 const categoryName = computed(() => rawCategoryName.value || 'Unknown category')
@@ -114,20 +130,19 @@ const categoryNameById = (id: string | null | undefined) => {
 }
 
 const fetchCategories = async () => {
-  if (!ownerId.value) {
+  if (!sessionId.value) {
     allCategories.value = []
-    categoriesError.value = 'Missing owner id.'
+    categoriesError.value = 'Missing session id.'
     categoriesLoading.value = false
     return
   }
   categoriesLoading.value = true
   categoriesError.value = null
   try {
-    const categories = await categoryApi.getCategoriesWithNames(ownerId.value)
+    const categories = await categoryApi.getCategoriesWithNames(sessionId.value)
     allCategories.value = categories.map(cat => ({
       ...cat,
       category_id: normalizeId(cat.category_id) ?? cat.category_id,
-      owner_id: normalizeId(cat.owner_id) ?? cat.owner_id,
     }))
   } catch (error: any) {
     categoriesError.value = error?.message ?? 'Failed to load categories.'
@@ -138,18 +153,19 @@ const fetchCategories = async () => {
 }
 
 const loadTransactions = async () => {
-  if (!ownerId.value || !categoryId.value) {
+  if (!sessionId.value || !categoryId.value) {
     transactionsState.status = 'error'
-    ;(transactionsState as any).error = 'Missing owner or category id.'
-    transactionsRaw.value = 'Missing owner or category id.'
+    ;(transactionsState as any).error = 'Missing session or category id.'
+    transactionsRaw.value = 'Missing session or category id.'
     return
   }
   transactionsState.status = 'loading'
   transactionsRaw.value = 'Loading…'
   try {
     const data = await categoryApi.listTransactions({
-      owner_id: ownerId.value,
+      session: sessionId.value,
       category_id: categoryId.value,
+      category_name: categoryName.value,
     })
     const normalized = data.map(entry => ({
       ...entry,
@@ -157,36 +173,32 @@ const loadTransactions = async () => {
     }))
     const enriched = await Promise.all(
       normalized.map(async entry => {
-        if (!entry.tx_id || !ownerId.value) {
+        if (!entry.tx_id || !sessionId.value) {
           return { ...entry, display_name: entry.tx_id }
         }
         try {
-          const info = await transactionApi.getTxInfo({ owner_id: ownerId.value, tx_id: entry.tx_id })
-          const merchantText = normalizeString((info as any)?.merchant_text ?? (info as any)?.tx_merchant) ?? null
-          const txName = normalizeString((info as any)?.tx_name ?? (info as any)?.name) ?? null
+          const info = await transactionApi.getTxInfo({
+            session: sessionId.value,
+            tx_id: entry.tx_id,
+          })
 
-          const resolveAmount = (): number | null => {
-            const rawAmount = (info as any)?.amount
-            if (typeof rawAmount === 'number' && Number.isFinite(rawAmount)) return rawAmount
-            if (typeof rawAmount === 'string' && rawAmount.trim()) {
-              const parsed = Number(rawAmount.trim())
-              return Number.isFinite(parsed) ? parsed : null
-            }
-            return null
-          }
+          console.debug('CategoryDetail: getTxInfo response', {
+            tx_id: entry.tx_id,
+            merchant_text: info.merchant_text,
+            amount: info.amount,
+            date: info.date,
+          })
 
-          const resolveDate = (): string | null => {
-            const rawDate = (info as any)?.date ?? (info as any)?.tx_date ?? (info as any)?.transaction_date
-            if (!rawDate) return null
-            const normalizedDate = normalizeString(rawDate)
-            if (!normalizedDate) return null
-            const parsed = new Date(normalizedDate)
-            return Number.isNaN(parsed.getTime()) ? normalizedDate : parsed.toISOString()
-          }
+          const merchantText = normalizeString(info.merchant_text) ?? 'NONE'
+          const amountFromInfo = typeof info.amount === 'number' && Number.isFinite(info.amount)
+            ? info.amount
+            : null
+          const dateFromInfo =
+            info.date instanceof Date && !Number.isNaN(info.date.getTime())
+              ? info.date.toISOString()
+              : null
 
-          const amountFromInfo = resolveAmount()
-          const dateFromInfo = resolveDate()
-          const displayName = merchantText || txName || entry.tx_id
+          const displayName = merchantText || entry.tx_id
 
           return {
             ...entry,
@@ -196,7 +208,11 @@ const loadTransactions = async () => {
             merchant_text: merchantText,
           }
         } catch (infoErr) {
-          console.warn('CategoryDetail: failed to fetch transaction info for history row', entry.tx_id, infoErr)
+          console.warn(
+            'CategoryDetail: failed to fetch parsed transaction info for history row',
+            entry.tx_id,
+            infoErr
+          )
           return { ...entry, display_name: entry.tx_id }
         }
       })
@@ -224,10 +240,10 @@ const loadMetrics = async () => {
     markMetricsDisabled()
     return
   }
-  if (!ownerId.value || !categoryId.value) {
+  if (!sessionId.value || !categoryId.value) {
     metricsState.status = 'error'
-    ;(metricsState as any).error = 'Missing owner or category id.'
-    metricsRaw.value = 'Missing owner or category id.'
+    ;(metricsState as any).error = 'Missing session or category id.'
+    metricsRaw.value = 'Missing session or category id.'
     return
   }
   const period = buildPeriod()
@@ -238,7 +254,7 @@ const loadMetrics = async () => {
   }
   if (new Date(period.startDate).getTime() > new Date(period.endDate).getTime()) {
     metricsFilterError.value = 'Start date must be before end date.'
-    metricsRaw.value = JSON.stringify({ requestPayload: { owner_id: ownerId.value, category_id: categoryId.value, period }, error: 'Start date after end date.' }, null, 2)
+    metricsRaw.value = JSON.stringify({ requestPayload: { session: sessionId.value, category_id: categoryId.value, period }, error: 'Start date after end date.' }, null, 2)
     return
   }
 
@@ -246,7 +262,7 @@ const loadMetrics = async () => {
   metricsState.status = 'loading'
   metricsRaw.value = 'Loading…'
   const requestPayload = {
-    owner_id: ownerId.value,
+    session: sessionId.value,
     category_id: categoryId.value,
     period,
   }
@@ -321,12 +337,12 @@ const confirmMove = async () => {
     moveState.error = 'Choose a destination category.'
     return
   }
-  if (!ownerId.value || !categoryId.value) {
-    moveState.error = 'Missing owner or category context.'
+  if (!sessionId.value || !categoryId.value) {
+    moveState.error = 'Missing session or category context.'
     return
   }
 
-  const owner = ownerId.value
+  const session = sessionId.value
   const currentCategoryId = categoryId.value
 
   moveState.loading = true
@@ -337,10 +353,10 @@ const confirmMove = async () => {
   const destinationId = moveState.targetCategoryId
 
   try {
-    await labelApi.update({ user_id: owner, tx_id: txId, new_category_id: destinationId })
+    await labelApi.update({ session, tx_id: txId, new_category_id: destinationId })
 
     await categoryApi.updateTransaction({
-      owner_id: owner,
+      session,
       tx_id: txId,
       old_category_id: currentCategoryId,
       new_category_id: destinationId,
@@ -367,12 +383,12 @@ const confirmMove = async () => {
 }
 
 const deleteTransaction = async (txId: string) => {
-  if (!ownerId.value || !categoryId.value) {
-    deleteState.error = 'Missing owner or category context.'
+  if (!sessionId.value || !categoryId.value) {
+    deleteState.error = 'Missing session or category context.'
     return
   }
 
-  const owner = ownerId.value
+  const session = sessionId.value
   const currentCategoryId = categoryId.value
 
   const confirmed = window.confirm('Are you sure you want to delete this transaction from the category?')
@@ -383,10 +399,10 @@ const deleteTransaction = async (txId: string) => {
   deleteState.message = null
 
   try {
-    await labelApi.remove({ user_id: owner, tx_id: txId })
+    await labelApi.remove({ session, tx_id: txId })
 
     await categoryApi.moveTransactionToTrash({
-      owner_id: owner,
+      session,
       from_category_id: currentCategoryId,
       tx_id: txId,
     })
@@ -412,8 +428,8 @@ const deleteTransaction = async (txId: string) => {
 }
 
 const deleteCategory = async () => {
-  if (!ownerId.value || !categoryId.value) {
-    categoryDeleteState.error = 'Missing owner or category context.'
+  if (!sessionId.value || !categoryId.value) {
+    categoryDeleteState.error = 'Missing session or category context.'
     return
   }
 
@@ -428,8 +444,9 @@ const deleteCategory = async () => {
   categoryDeleteState.loading = true
   try {
     const transactions = await categoryApi.listTransactions({
-      owner_id: ownerId.value,
+      session: sessionId.value,
       category_id: categoryId.value,
+      category_name: categoryName.value,
     })
 
     if (Array.isArray(transactions) && transactions.length > 0) {
@@ -443,9 +460,8 @@ const deleteCategory = async () => {
     }
 
     await categoryApi.delete({
-      owner_id: ownerId.value,
+      session: sessionId.value,
       category_id: categoryId.value,
-      can_delete: true,
     })
 
     categoryDeleteState.message = 'Category deleted.'
@@ -462,9 +478,10 @@ const deleteCategory = async () => {
   }
 }
 
-const formatDate = (iso: string) => {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString()
+const formatDate = (value: string | Date | null | undefined) => {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString()
 }
 
 const formatCurrency = (amount: number) =>
@@ -483,7 +500,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => ownerId.value,
+  () => sessionId.value,
   (newOwner, oldOwner) => {
     if (!newOwner || newOwner === oldOwner) return
     fetchCategories()
@@ -491,7 +508,7 @@ watch(
 )
 
 watch(
-  () => [ownerId.value, categoryId.value] as const,
+  () => [sessionId.value, categoryId.value] as const,
   ([newOwner, newCategory], [oldOwner, oldCategory]) => {
     if (!newOwner || !newCategory) return
     if (newOwner !== oldOwner || newCategory !== oldCategory) {
@@ -530,7 +547,7 @@ watch(
       markMetricsDisabled()
       return
     }
-    if (ownerId.value && categoryId.value) {
+    if (sessionId.value && categoryId.value) {
       loadMetrics()
     }
   }

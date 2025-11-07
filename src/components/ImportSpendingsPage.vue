@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { transactionApi, fileUploadingApi } from '../api'
-import type { Transaction, User, UploadFileRequest, UploadFileResponse } from '../api'
+import { transactionApi } from '../api'
+import type { Transaction, User } from '../api'
 import { normalizeId } from '../utils/normalize'
 
 const props = defineProps<{
@@ -17,20 +17,18 @@ const loading = ref(false)
 const fileReading = ref(false)
 const lastFileName = ref<string | null>(null)
 const transactions = ref<Transaction[]>([])
-const uploadedFileId = ref<string | null>(null)
 
-// Safely extract a string user id from various shapes
-const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
+// Safely extract a session id from various shapes
+const extractSessionId = (u: unknown): string | null => normalizeId((u as any)?.session ?? u)
 
-const userId = computed(() => extractUserId(props.user))
+const sessionId = computed(() => extractSessionId(props.user))
 
 const importCsvContent = async (content: string) => {
   error.value = null
   transactions.value = []
-  uploadedFileId.value = null
 
-  const currentUserId = userId.value
-  if (!currentUserId) {
+  const currentSession = sessionId.value
+  if (!currentSession) {
     error.value = 'You must be signed in to import transactions.'
     return
   }
@@ -41,28 +39,15 @@ const importCsvContent = async (content: string) => {
 
   loading.value = true
   try {
-    const uploadRequest: UploadFileRequest = {
-      owner: currentUserId,
-      name: lastFileName.value || `pasted-import-${new Date().toISOString().split('T')[0]}.csv`,
-      content,
-    }
-
-    try {
-      const uploadResult: UploadFileResponse = await fileUploadingApi.uploadFile(uploadRequest)
-      uploadedFileId.value = uploadResult?.file ?? null
-    } catch (uploadErr) {
-      console.warn('Upload to FileUploading failed; continuing with inline import', uploadErr)
-    }
-
     const result = await transactionApi.importTransactions({
-      owner_id: currentUserId,
+      session: currentSession,
       fileContent: content,
     })
     const imported = Array.isArray(result) ? result : []
     transactions.value = imported
 
-    if (typeof window !== 'undefined' && currentUserId) {
-      const metaKey = `ff:last-import:${currentUserId}`
+    if (typeof window !== 'undefined' && currentSession) {
+      const metaKey = `ff:last-import:${currentSession}`
       const payload = {
         timestamp: new Date().toISOString(),
         count: imported.length,
@@ -175,10 +160,6 @@ const handleFileChange = async (event: Event) => {
                 </span>
                 {{ error }}
               </div>
-              <p v-if="uploadedFileId && !error" class="file-status">
-                Uploaded to file storage as
-                <strong>{{ uploadedFileId }}</strong>
-              </p>
               <button type="submit" class="action-button primary" :disabled="loading || fileReading">
                 {{ (loading || fileReading) ? 'Importing…' : 'Import CSV' }}
               </button>

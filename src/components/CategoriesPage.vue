@@ -34,11 +34,11 @@ const closeAddCategory = () => {
 }
 
 // Safely extract a string user id from various shapes
-const extractUserId = (u: unknown): string | null => normalizeId((u as any)?.user_id ?? (u as any)?.id ?? u)
+const extractSessionId = (u: unknown): string | null => normalizeId((u as any)?.session ?? u)
 
-const extractedUserId = computed(() => extractUserId(props.user))
+const sessionId = computed(() => extractSessionId(props.user))
 
-watch(extractedUserId, (next, prev) => {
+watch(sessionId, (next, prev) => {
   if (next === prev) return
   if (!next) {
     allCategories.value = []
@@ -53,15 +53,15 @@ const fetchCategories = async () => {
   error.value = null
   loading.value = true
   try {
-    const ownerId = extractedUserId.value
-    if (!ownerId) {
+    const session = sessionId.value
+    if (!session) {
       allCategories.value = []
       error.value = 'Sign in to load your categories.'
       return
     }
-  const categories = await categoryApi.getCategoriesWithNames(ownerId)
-  allCategories.value = categories
-  rowErrors.value = {}
+    const categories = await categoryApi.getCategoriesWithNames(session)
+    allCategories.value = categories
+    rowErrors.value = {}
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load categories'
     console.error('Categories fetch error:', e)
@@ -72,7 +72,8 @@ const fetchCategories = async () => {
 
 const addCategory = async () => {
   addError.value = null
-  if (!props.user?.user_id) {
+  const session = sessionId.value
+  if (!session) {
     addError.value = 'You must be signed in to add a category.'
     return
   }
@@ -82,8 +83,7 @@ const addCategory = async () => {
   }
   adding.value = true
   try {
-    const ownerIdToSend = extractedUserId.value || ''
-    const createResp = await categoryApi.create({ owner_id: ownerIdToSend, name: newCategoryName.value.trim() })
+    const createResp = await categoryApi.create({ session, name: newCategoryName.value.trim() })
     console.debug('Create category response:', createResp)
     await fetchCategories()
     closeAddCategory()
@@ -135,17 +135,21 @@ const saveEdit = async (c: any, idx: number) => {
     editStatus.value[idx] = 'Please provide a name.'
     return
   }
-  const ownerId = extractedUserId.value || ''
+  const session = sessionId.value
+  if (!session) {
+    editStatus.value[idx] = 'You must be signed in to edit categories.'
+    return
+  }
   editStatus.value[idx] = 'Saving...'
   try {
   const catId = normalizeId((c as any).category_id ?? (c as any).categoryId)
     if (catId) {
       // Call rename endpoint
-  await categoryApi.rename({ owner_id: ownerId, category_id: catId, new_name: newName })
+      await categoryApi.rename({ session, category_id: catId, new_name: newName })
       editStatus.value[idx] = 'Renamed.'
     } else {
       // Fallback: create a new category with the new name
-  await categoryApi.create({ owner_id: ownerId, name: newName })
+      await categoryApi.create({ session, name: newName })
       editStatus.value[idx] = 'Created new category (rename not possible).' 
     }
     // Re-fetch the full category list and then filter for this owner to ensure
@@ -161,7 +165,7 @@ const saveEdit = async (c: any, idx: number) => {
     })
     if (nameCounts[newName] > 1) {
       editStatus.value[idx] = 'Warning: duplicate category name exists after rename.'
-      console.warn('Duplicate category names for owner', ownerId, newName, ownerCats)
+      console.warn('Duplicate category names detected after rename', { newName, categories: ownerCats })
     } else {
       editStatus.value[idx] = 'Saved.'
     }
@@ -176,14 +180,9 @@ const saveEdit = async (c: any, idx: number) => {
 
 const deleteCategory = async (category: CategoryNameOwner, idx: number) => {
   setRowError(idx, null)
-  if (!props.user?.user_id) {
+  const session = sessionId.value
+  if (!session) {
     setRowError(idx, 'You must be signed in to delete a category.')
-    return
-  }
-
-  const ownerId = extractedUserId.value
-  if (!ownerId) {
-    setRowError(idx, 'Missing owner information for this category.')
     return
   }
 
@@ -195,13 +194,17 @@ const deleteCategory = async (category: CategoryNameOwner, idx: number) => {
 
   deletingIndex.value = idx
   try {
-    const transactions = await categoryApi.listTransactions({ owner_id: ownerId, category_id: categoryId })
+    const transactions = await categoryApi.listTransactions({
+      session,
+      category_id: categoryId,
+      category_name: category.name,
+    })
     if (Array.isArray(transactions) && transactions.length > 0) {
       setRowError(idx, 'This category must have no transactions to be deleted.')
       return
     }
 
-    await categoryApi.delete({ owner_id: ownerId, category_id: categoryId, can_delete: true })
+  await categoryApi.delete({ session, category_id: categoryId })
     await fetchCategories()
   } catch (err) {
     console.error('Delete category error:', err)

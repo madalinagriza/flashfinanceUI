@@ -373,11 +373,12 @@
 **Success Response Body (Action):**
 ```json
 [{
+  "tx": {
   "total_amount": "Number",
   "transaction_count": "Number",
   "average_per_day": "Number",
   "days": "Number"
-}]
+}}]
 ```
 
 **Error Response Body:**
